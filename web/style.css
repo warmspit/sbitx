@@ -1,5 +1,6 @@
 body {
 	overflow-x: hidden;
+	margin: 0px;
 }
 
 #sdr_page:after {
@@ -12,7 +13,7 @@ body {
 .slider-label {
 	display: inline-block;
 	width: 50px;
-	text-align: right:
+	text-align: right;
 	font-weight: bold;
 }
 
@@ -100,7 +101,7 @@ select, select option, input {
 	color: white;
 	display: none;
 	padding-left: 10px;
-	z-index = 1;
+	z-index: 1;
 }
 
 #rx_controls {
@@ -149,7 +150,7 @@ select, select option, input {
 	padding-right: 5px;
 	display: inline-block;
 	width: 72px;
-	text-algin: left;
+	text-align: left;
 }
 
 #tx_drive_reading {
@@ -253,7 +254,6 @@ select, select option, input {
 
 /* logbook, opens in a different tab */
 #logbook_panel {
-	zindex = 1;
 	opacity: 1;
 	z-index: 1;
 }
@@ -420,10 +420,9 @@ select, select option, input {
 	padding-bottom: 10px;
 	position: fixed;
 	left: 200px;
-	top = 0px;
+	top: 0px;
 	border: solid 1px white;
 	background-color: black; 
-	zindex = 1;
 	opacity: 1;
 	z-index: 1;
 }
@@ -564,7 +563,7 @@ body {
 	height: 36px;
 	min-height: 36px;
 	border: solid 1px #333; 
-//	background-color: #044b59;
+    /*	background-color: #044b59; */
 	
 	font-size: 12px;
 	vertical-align:top;
@@ -577,7 +576,7 @@ body {
 	font-size: 13px;
 	margin: 0;
 	width: 48px;
-//	background-color: #044b59;
+	/*	background-color: #044b59; */
 
 /*	-webkit-appearance: none;
 	-ms-appearance: none;
