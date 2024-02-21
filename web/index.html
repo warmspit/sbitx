@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <!--
 	HOW IT WORKS
@@ -32,7 +33,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>sBitx</title>
     <script src="jquery.min.js"></script>
-    <script src="jquery.knob.min.js"></script>
+    <script src="jquery.knob.js"></script>
     <script src="pcm-player.js"></script> 
 		<link rel="stylesheet" href="style.css">
   </head>
@@ -47,9 +48,11 @@
 	<input type="hidden" id="STATUS" value="---" />
 	<input type="hidden" id="REC" value="OFF" /> 
 	<input type="hidden" id="RIT_DELTA" name="RIT_DELTA" value="" /> 
-	<input type="hidden" id="VFO" value="A" />
+	<input type="hidden" id="VFOx" value="A" />
   <div id="sdr_page">
 	<div id="maincontrols">
+		<button class="sbitxv3-btn" id="knob_on" type="button">Knob</button>
+		<button class="sbitxv3-btn" id="sound_mute" type="button">Sound</button>
 		<div class="sbitxv3-control">
 			<div class="sbitxv3-label">MODE</div>
 			<select class="sbitxv3-selection sbitx-selection" id="MODE">
@@ -63,8 +66,9 @@
 				<option value="DIGITAL">DIGITAL</option> 
 				<option value="2TONE">2TONE</option>
 			</select>
-		</div><div class="sbitxv3-control" id="dial">
-    	<span id="current_freq">A:00.000.000</span> 
+		</div>
+		<div class="sbitxv3-control" id="dial">
+    		<span id="current_freq">A:00.000.000</span> 
 			<span id="other_freq">B: 00.000.000</span>
 		</div><!-- funny html that breaks the line inside the button tag to 
 		prevent spaces between the elements 
@@ -86,7 +90,7 @@
 			</select>
 		</div><div class="linear rx-control" id="linear_BW">
     	<div class="linear-label">BW</div>
-    	<input type="number" id="BW" min="0" max="100" class="linear-value" />
+    	<input type="number" id="BW" min="50" max="5000" step="50" class="linear-value" />
      	<div class="linear-dropdown">
       	<input type="range" class="linear-slider"
         	id="slider_BW" max="5000" min="50" step="50" value="13" />
@@ -105,7 +109,8 @@
       	<input type="range" class="linear-slider"
         	id="slider_AUDIO" max="100" min="0" step="1" value="13" />
 			</div>
-    </div><br/>
+    </div>
+	<br/>
 		<div class="linear" id="linear_DRIVE">
     	<div class="linear-label">DRIVE</div>
     	<input type="number" id="DRIVE" min="1" max="100" class="linear-value" />
@@ -118,6 +123,7 @@
 			<select id="STEP" class="sbitx-selection sbitxv3-selection">
 				<option value="10H">10H</option>
 				<option value="100H">100H</option>
+				<option value="500H">500H</option>
 				<option value="1K">1K</option>
 				<option value="10K">10K</option>
 				<option value="100K">100K</option>
@@ -153,7 +159,7 @@
 			id="NR" placeholder="Nr" size="2" 
 		/><button class="sbitxv3-btn" id="logger-log">OK</button
 		><button class="sbitxv3-btn" id="wipe">WIPE</button
-		><button class="sbitxv3-btn" id="logbook-open">SAVE</button
+		><button class="sbitxv3-btn" id="logbook-open">LOG</button
 		><div class="sbitxv3-control">
 			<div class="sbitxv3-label">SPAN</div>
 			<select class="sbitxv3-selection sbitx-selection" id="SPAN">
@@ -246,6 +252,8 @@
 			</tbody>
 		</table>
 	</div>
+	<div><input type="text" id="CHECK" placeholder="check" size = "92" class="check" /></div>
+
 <!--   panadapter, xxxx_open functions will resize this as needed -->
 <!-- pan adapter and waterfall -->
 		<div id="pan_adapter">
@@ -471,11 +479,13 @@
 var in_tx = false;
 var parser = null;
 var qrz_window = null;
+var log_window = null;
 var session_id = "nullsession";
 var macros_file = "";
 var spots = null;
 var logbook_bottom_row_id = -1;
 var logbook_top_row_id= 0;
+var sound_mute = false;
 
 /* a few helper functions */
 function el(element_id){
@@ -749,6 +759,20 @@ function draw_dial(){
 let tuning_position_last = 0;
 var knob_resolution = 6;
 
+function getStepSize() {
+	var step_text = el("STEP").value;
+	var step_size = 1000;
+	switch(step_text){
+		case "10H": step_size = 10; break;
+		case "100H": step_size = 100; break;
+		case "500H": step_size = 500; break;
+		case "1K": step_size = 1000; break;
+		case "10K": step_size = 10000; break;
+		case "100K": step_size = 100000; break;
+	}
+	return step_size;
+}
+
 function tuning_knob_handler(position_now){
 	//avoid small movements
 	if (Math.abs(position_now - tuning_position_last) < knob_resolution)
@@ -769,15 +793,8 @@ function tuning_knob_handler(position_now){
 	//reduce the precision of delta
 	delta = Math.round(delta / knob_resolution);
 	//tuning up or down by the step value		
-	var step_text = el("STEP").value;
-	var step_size = 1000;
-	switch(step_text){
-		case "10H": step_size = 10; break;
-		case "100H": step_size = 100; break;
-		case "1K": step_size = 1000; break;
-		case "10K": step_size = 10000; break;
-		case "100K": step_size = 100000; break;
-	}
+    var step_size = getStepSize();
+
 	f = el('FREQ');
 	var freq = parseInt(f.value);
 	freq = Math.round(freq/step_size) * step_size;
@@ -798,6 +815,7 @@ $(function($) {
 		tuning_knob_handler(value);
 	},
 	release : function (value) {
+		tuning_knob_handler(value); // +llh
   	//console.log(this.$.attr('value'));
     //console.log("release : " + value);
  	},
@@ -809,7 +827,19 @@ $(function($) {
   });
 });
 
-
+function change_freq(event) {
+	event.preventDefault();
+	let f = el('FREQ');
+	var freq = parseInt(f.value);
+	var step_size = getStepSize();
+	freq = Math.round(freq/step_size) * step_size;
+	if (event.deltaY > 0)
+		freq += step_size;
+	else
+		freq -= step_size;
+	f.value = freq;
+	update_freq(f.value);	
+}
 
 /* waterfall and spectrum */
 
@@ -849,7 +879,27 @@ function waterfall_init(){
 	}
 	ctx.putImageData(waterfall_image, 0, 0);
 }
+// llh1 +
 
+function getMousePosition(canvas, event) {
+  let rect = canvas.getBoundingClientRect();
+  let x = event.clientX - rect.left;
+  let w = rect.width;
+  console.log("waterfall click " +  x + ", " + w);
+  let freq = parseInt(el('FREQ').value);
+  let span = parseFloat(el('SPAN').value)*1000;
+  freq = Math.round((freq-span/2 + (span/w)*x)/100)*100;
+  console.log("waterfall freq " +  freq);
+  update_freq(freq);	
+}
+
+canvasElem = el("waterfall");
+
+$('#waterfall').mousedown(function(e) {
+  getMousePosition(canvasElem, e);
+});
+
+// + llh
 var nbins = 0;
 
 function spectrum_update(update){
@@ -1439,11 +1489,17 @@ function FT8_message_chosen(event){
 		return;
 	}
 
-	//this is the start of a new call
-	logger_wipe();
-	logger_abort();
-	FT8_list_append("wsjtx-rx", message_text);
-	websocket_send("FT8 "+message_text);
+	websocket_send("FT8_check "+message_text);
+
+	/*
+	if (confirm(message_text) == true) {
+		//this is the start of a new call
+		logger_wipe();
+		logger_abort();
+		FT8_list_append("wsjtx-rx", message_text);
+		websocket_send("FT8 "+message_text);
+  	} 
+	*/
 }
 
 function FT8_new_message(text, style){
@@ -1625,19 +1681,19 @@ function logger_qrz(event){
 	else if (qrz_window.closed)
 		qrz_window = window.open(url, "_blank");
 	else
-		qrz.window.location = url;
+		qrz_window.location = url;
 }
 
 function logbook_open(event){
 //	var url = "https://www.qrz.com/db/" + $("#CALL").val();
-	var url = window.location.href+ "logbook.html";
+	var url = window.location.origin + "/logbook.html";
 
-	if (qrz_window == null)
-		qrz_window = window.open(url, "_blank");
-	else if (qrz_window.closed)
-		qrz_window = window.open(url, "_blank");
-	else
-		qrz.window.location = url;
+	if (log_window == null)
+		log_window = window.open(url, "log");
+	else //if (log_window.closed)
+		log_window = window.open(url, "log");
+	//else
+		//log_window.location = url;
 }
 function logger_enter_qso(){
 	var contact_callsign = el("CALL").value.toUpperCase();
@@ -1782,7 +1838,7 @@ function logbook_update(args){
 	//callsign
 	item = row.insertCell(-1);
 	item.innerHTML = token[8];
-	item.className = "logbook-field logbook-call";
+	item.className = "logbook-lfield logbook-call";
 	//sent
 	item = row.insertCell(-1);
 	item.innerHTML = token[6] + '  ' + token[7];		
@@ -2018,7 +2074,7 @@ function response_handler(response){
 	if (response instanceof Blob){
 		f = new FileReader();
 		f.onload = () => {
-			if (player != null){
+			if (player != null && !sound_mute){
 				var samples = new Int16Array(f.result);
 				var upsample =  new Int16Array(samples.length * intp_factor);
 				var j = 0;	
@@ -2107,6 +2163,18 @@ function response_handler(response){
 		case 'MACRO':
 			logger_macro_changed_from_sdr(args);
 			break;
+		case 'FT8_check_res':
+			// args is message_text
+			if (confirm(args) == true) {
+				//this is the start of a new call
+				/*
+				logger_wipe();
+				logger_abort();
+				FT8_list_append("wsjtx-rx", message_text);
+				websocket_send("FT8 "+message_text);
+				*/
+			} 
+			break;
 		case 'MODE':
 			mode_set(args); 
 			//There is no break statement here, MODE continues to default case
@@ -2173,6 +2241,9 @@ $(".macro-btn").on("click", logger_trigger_macro);
 //$(".ft8-clickable").on("click", FT8_message_chosen);
 
 //specific control handler
+$("#knob_on").on("click", toggle_dial);
+$("#sound_mute").on("click", () => { sound_mute = !sound_mute;});
+el("dial").addEventListener("wheel", change_freq, { passive: false });
 $("#REF").on("change", draw_meters);
 $("#MODE").on("change", mode_changed);
 $("#console-open").on("click", show_console_panel);
@@ -2242,7 +2313,7 @@ $("#record_start").on("click", start_recorder);
 $("#record_stop").on("click", stop_recorder);
 
 //toggle the soft dial knob
-$("#dial").on("click", toggle_dial);
+//$("#dial").on("click", toggle_dial);
 window.onload = ui_init();
 
 //init the state of the ui

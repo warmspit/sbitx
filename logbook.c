@@ -36,6 +36,7 @@ GtkListStore *list_store=NULL;
 GtkTreeSelection *selection = NULL;
 GtkWidget *logbook_window = NULL;
 
+void logbook_open();
 int logbook_fill(int from_id, int count, char *query);
 void clear_tree(GtkListStore *list_store);
 
@@ -47,6 +48,8 @@ int logbook_query(char *query, int from_id, char *result_file){
 	sqlite3_stmt *stmt;
 	char statement[200], json[10000], param[2000];
 
+	if (db == NULL)
+		logbook_open();
 
 	//add to the bottom of the logbook
 	if (from_id > 0){
@@ -142,6 +145,65 @@ int logbook_count_dup(const char *callsign, int last_seconds){
 	return rec;
 }
 
+int logbook_prev_log(const char *callsign, char *result){
+	char statement[1000], param[2000];
+	sqlite3_stmt *stmt;
+
+	sprintf(statement, "select * from logbook where "
+		"callsign_recv=\"%s\" ORDER BY id DESC",
+		callsign);
+	strcpy(result, callsign);
+	strcat(result, ": ");
+	int res = sqlite3_prepare_v2(db, statement, -1, &stmt, NULL);
+	printf("%s : %d\n", statement, res);
+	int rec = 0;
+	while (sqlite3_step(stmt) == SQLITE_ROW) {
+		int i;
+		int num_cols = sqlite3_column_count(stmt);
+		if (rec == 0) {
+
+			for (i = 0; i < num_cols; i++){
+				char const *col_name = sqlite3_column_name(stmt, i);
+			    if (!strcmp(col_name, "id")) { continue; }
+				if (!strcmp(col_name, "callsign_recv")) { continue; }
+				switch (sqlite3_column_type(stmt, i))
+				{
+				case (SQLITE3_TEXT):
+					strcpy(param, sqlite3_column_text(stmt, i));
+					break;
+				case (SQLITE_INTEGER):
+					sprintf(param, "%d", sqlite3_column_int(stmt, i));
+					break;
+				case (SQLITE_FLOAT):
+					sprintf(param, "%g", sqlite3_column_double(stmt, i));
+					break;
+				case (SQLITE_NULL):
+					break;
+				default:
+					sprintf(param, "%d", sqlite3_column_type(stmt, i));
+					break;
+				}
+				printf("%s : %s\n", col_name, param);
+				strcat(result, param);
+				if (!strcmp(col_name, "qso_date")) strcat(result, "_");
+				else strcat(result, " ");
+			}
+		}
+		rec++;
+	}
+	sqlite3_finalize(stmt);
+	sprintf(param, ": %d", rec);
+	strcat(result, param);
+	/*if (rec > 1) {
+		sprintf(param, "\nand %d more.", rec-1);
+		strcat(result, param);
+	} else
+	if (rec == 0) {
+		sprintf(result, "%s not logged.", callsign);
+	}*/
+	return rec;
+}
+
 void logbook_open(){
 	char db_path[200];	//dangerous, find the MAX_PATH and replace 200 with it
 	sprintf(db_path, "%s/sbitx/data/sbitx.db", getenv("HOME"));
@@ -175,8 +237,11 @@ void logbook_add(char *contact_callsign, char *rst_sent, char *exchange_sent,
 	if (db == NULL)
 		logbook_open();
 
-	sqlite3_exec(db, statement, 0,0, &err_msg);
-	
+	int res = sqlite3_exec(db, statement, 0,0, &err_msg);
+	if (res != 0) {
+		printf("logbook_add db: %d err=%s", res, err_msg);
+		if (err_msg) sqlite3_free(err_msg);
+	}
 	//refresh the list if opened
 	if (list_store){
 		clear_tree(list_store);

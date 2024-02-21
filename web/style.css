@@ -295,6 +295,14 @@ select, select option, input {
 	color: #888; 
 }
 
+.logbook-lfield {
+	font-size: 10pt;
+	color: white;
+	text-transform:uppercase;
+	padding-left: 10px;
+	text-align: left;
+}
+
 .logbook-field {
 	font-size: 10pt;
 	color: white;
@@ -451,7 +459,7 @@ select, select option, input {
 	float: right;
 	display: inline-block;
 	background-color: black;
-	font-size; 14pt;
+	font-size: 14pt;
 }
 
 .sbitx-btn-back {
@@ -477,7 +485,7 @@ select, select option, input {
 	font-family: courier, monspace-ui, monospace;
 	font-size: 10pt;
 	height: 235px;
-	width: 290px;
+	width: 400px;/* 290px; */
 	overflow: auto;
 	border: none;
 }

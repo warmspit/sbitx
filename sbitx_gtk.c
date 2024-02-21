@@ -18,6 +18,8 @@ The initial sync between the gui values, the core radio values, settings, et al 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <ncurses.h>
+#include <time.h>
+#include <glib.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <sys/types.h>
@@ -466,7 +468,7 @@ struct field main_controls[] = {
 	{"#12m", NULL, 90, 5, 40, 40, "12M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
 	{"#15m", NULL, 130, 5, 40, 40, "15M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
-		"", 0,0,0i,COMMON_CONTROL},
+		"", 0,0,0,COMMON_CONTROL},
 	{"#17m", NULL, 170, 5, 40, 40, "17M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
 	{"#20m", NULL, 210, 5, 40, 40, "20M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
@@ -497,7 +499,7 @@ struct field main_controls[] = {
 		"", 0, 100, 1,COMMON_CONTROL},
 
 	{"#step", NULL, 560, 5 ,40, 40, "STEP", 1, "10Hz", FIELD_SELECTION, FONT_FIELD_VALUE, 
-		"10K/1K/100H/10H", 0,0,0,COMMON_CONTROL},
+		"10K/1K/500H/100H/10H", 0,0,0,COMMON_CONTROL},
 	{"#span", NULL, 560, 50 , 40, 40, "SPAN", 1, "A", FIELD_SELECTION, FONT_FIELD_VALUE, 
 		"25K/10K/6K/2.5K", 0,0,0,COMMON_CONTROL},
 
@@ -636,6 +638,8 @@ struct field main_controls[] = {
     "", 300, 3000, 50, 0},
 
 	//FT8 controls
+	{"#ft8_check", NULL, 1000, -1000, 50, 50, "CHECK", 50, "check", FIELD_TEXT, FONT_LOG, 
+		"nobody", 0,128,0,0},
 	{"#ft8_auto", NULL, 1000, -1000, 50, 50, "FT8_AUTO", 40, "ON", FIELD_TOGGLE, FONT_FIELD_VALUE, 
 		"ON/OFF", 0,0,0, FT8_CONTROL},
 	{"#ft8_tx1st", NULL, 1000, -1000, 50, 50, "FT8_TX1ST", 40, "ON", FIELD_TOGGLE, FONT_FIELD_VALUE, 
@@ -2817,8 +2821,15 @@ int do_toggle_kbd(struct field *f, cairo_t *gfx, int event, int a, int b, int c)
 	return 0;
 }
 
-
 void open_url(char *url){
+	char temp_line[200];
+
+	sprintf(temp_line, "xdg-open  %s"
+	"  >/dev/null 2> /dev/null &", url);
+	execute_app(temp_line);
+}
+
+void open_chromeurl(char *url){
 	char temp_line[200];
 
 	sprintf(temp_line, "chromium-browser --log-leve=3 "
@@ -3866,7 +3877,7 @@ void ui_init(int argc, char *argv[]){
 
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   gtk_window_set_default_size(GTK_WINDOW(window), 800, 480);
-  gtk_window_set_default_size(GTK_WINDOW(window), screen_width, screen_height);
+  //gtk_window_set_default_size(GTK_WINDOW(window), screen_width, screen_height);
   gtk_window_set_title( GTK_WINDOW(window), "sBITX" );
 	gtk_window_set_icon_from_file(GTK_WINDOW(window), "/home/pi/sbitx/sbitx_icon.png", NULL);
 
@@ -4169,6 +4180,8 @@ void do_control_action(char *cmd){
 		tuning_step = 10000;
 	else if (!strcmp(request, "STEP 1K"))
 		tuning_step = 1000;
+	else if (!strcmp(request, "STEP 500H"))
+		tuning_step = 500;
 	else if (!strcmp(request, "STEP 100H"))
 		tuning_step = 100;
 	else if (!strcmp(request, "STEP 10H"))
@@ -4259,6 +4272,87 @@ void do_control_action(char *cmd){
 	}
 }
 
+int get_ft8_callsign(const char* message, char* other_callsign) {
+	int i = 0, j = 0, m = 0, len, cur_field = 0;
+	char fields[4][32];
+	other_callsign[0] = 0;
+	len = (int)strlen(message);
+	const char* mycall = field_str("MYCALLSIGN");
+	while (i <= len) {
+		if (message[i] == ' ' || message[i] == '\0' || j >= 31) { 
+			i++;
+			while (i < len && message[i] == ' ') { i++; }
+			if (m > 3) {
+				break;
+			}
+			fields[m][j] = '\0';
+			if (cur_field == 4) {
+				if (strcmp(fields[m], "~")) {
+					return -1;  // no tilde
+				}
+			}
+			cur_field++;
+			if (cur_field > 5) {
+				m++;
+			}
+			j = 0;
+		}
+		else {
+			fields[m][j++] = message[i];
+			i++;
+		}
+		
+		if (m > 4) {
+			return -2; // to many fields
+		}
+	}
+	if (cur_field < 7) {
+		return -3; // to few fields
+	}
+	if (!strcmp(fields[0], "CQ")) {
+		if (m == 4) { 
+			i = 2; // CQ xx callsign grid
+		}
+		else { 
+			i = 1; // CQ callsign grid
+		}
+	}
+	else if (!strcmp(fields[0], mycall)) {
+		i = 1; // mycallsign callsign
+	}
+	else {
+		i = 0; // callsign other
+	}
+	strcpy(other_callsign, fields[i]);
+	return m;
+}
+
+void pre_ft8_check(char* message) {
+	char result[500];
+	char other_callsign[40];
+	
+	//printf("pre_ft8_check: message='%s'\n", message);
+	if (get_ft8_callsign(message, other_callsign) >= 0) {
+		//strcpy(result,"FT8_check_res ");
+		int cnt = logbook_prev_log(other_callsign, result);
+		char *p =strchr(message, '~');
+		if (p) {
+			strcat(result, p-1);
+		}
+
+		printf("pre_ft8_check: '%s'\n", result);
+
+		if (strlen(result) > 127 ) {
+			result[127] = 0;
+		}
+        int equal_last_check = strcmp(get_field("#ft8_check")->value, result);
+		set_field("#ft8_check", result);
+		if (cnt == 0 || equal_last_check == 0) {
+			ft8_process(message, FT8_START_QSO);
+		}
+	}
+}
+
 /*
 	These are user/remote entered commands.
 	The command format is "CMD VALUE", the CMD is an all uppercase text
@@ -4300,6 +4394,9 @@ void cmd_exec(char *cmd){
 	if (!strcmp(exec, "FT8")){
 		ft8_process(args, FT8_START_QSO);
 	}
+	else if (!strcmp(exec, "FT8_check")) {
+		pre_ft8_check(args);
+	}
 	else if (!strcmp(exec, "callsign")){
 		strcpy(get_field("#mycallsign")->value,args); 
 		sprintf(response, "\n[Your callsign is set to %s]\n", get_field("#mycallsign")->value);
@@ -4329,6 +4426,7 @@ void cmd_exec(char *cmd){
 		char *path = getenv("HOME");
 		sprintf(fullpath, "mousepad %s/sbitx/data/logbook.txt", path); 
 		execute_app(fullpath);
+		printf("fullpath");
 	}
 	else if (!strcmp(exec, "clear")){
 		console_init();
