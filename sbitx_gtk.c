@@ -3877,7 +3877,7 @@ void ui_init(int argc, char *argv[]){
 
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   gtk_window_set_default_size(GTK_WINDOW(window), 800, 480);
-  //gtk_window_set_default_size(GTK_WINDOW(window), screen_width, screen_height);
+  gtk_window_set_default_size(GTK_WINDOW(window), screen_width, screen_height);
   gtk_window_set_title( GTK_WINDOW(window), "sBITX" );
 	gtk_window_set_icon_from_file(GTK_WINDOW(window), "/home/pi/sbitx/sbitx_icon.png", NULL);
 
@@ -4347,8 +4347,15 @@ void pre_ft8_check(char* message) {
 		}
         int equal_last_check = strcmp(get_field("#ft8_check")->value, result);
 		set_field("#ft8_check", result);
+
 		if (cnt == 0 || equal_last_check == 0) {
 			ft8_process(message, FT8_START_QSO);
+		} else {
+			field_set("CALL", other_callsign); // make it easy to make a call
+			field_set("SENT", "");
+			field_set("EXCH", "");
+			field_set("RECV", "");
+			field_set("NR", "");
 		}
 	}
 }
