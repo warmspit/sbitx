@@ -17,12 +17,20 @@ demodulates it and writes out to the speaker/audio output.
 sound_mixer(). search for this function to know how to work this.
 
 */
-int sound_thread_start(char *device);
+
+#define UNUSED_PARAMETER 0
+#define RX_VOLUME_CONTROL 1
+#define TX_GAIN_CONTROL 2
+
+// int sound_thread_start(char *device);	// Commented out N3SB 04-Feb-2024
+int sound_thread_start(char *if_input_device, char *sound_output_device);		// N3SB Hack to support two device parameters
+
+
 void sound_process(
 	int32_t *input_rx, int32_t *input_mic, 
 	int32_t *output_speaker, int32_t *output_tx, 
 	int n_samples);
 void	sound_thread_stop();
 void sound_volume(char *card_name, char *element, int volume);
-void sound_mixer(char *card_name, char *element, int make_on);
+void sound_mixer(char *card_name, char *element, int channel, int make_on);
 void sound_input(int loop);

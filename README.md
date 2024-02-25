@@ -23,3 +23,8 @@ The bandwidth BW now steps from 50 to 5000 in steps of 50.
 In FT8 mode, when a CQ XXXX GGGG is clicked the XXXX callsign is checked against the LOG. 
 If the callsign is found the latest LOG info is shown on a line and a QSO is not started.
 If the callsign was not found the QSO is started as before.
+
+2024 02 25:
+Updated the code with 
+Bechmans sound fix https://github.com/sbeckman/sbitx-clickfix and
+sound output option: https://github.com/sbeckman/sbitx-sound-output-control 

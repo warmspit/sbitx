@@ -69,14 +69,15 @@ examples of using sound_mixer function:
 
 */
 
+/* This function is not used.
 void sound_volume(char *card_name, char *element, int volume)
 {
     long min, max;
     snd_mixer_t *handle;
     snd_mixer_selem_id_t *sid;
-		char *card;
-
-		card = card_name;
+	char *card;
+    
+	card = card_name;
     snd_mixer_open(&handle, 0);
     snd_mixer_attach(handle, card);
     snd_mixer_selem_register(handle, NULL, NULL);
@@ -92,13 +93,19 @@ void sound_volume(char *card_name, char *element, int volume)
 
     snd_mixer_close(handle);
 }
-
-void sound_mixer(char *card_name, char *element, int make_on)
+*/
+// void sound_mixer(char *card_name, char *element, int make_on)	// Commented out N3SB 06-Feb-2024
+void sound_mixer(char *card_name, char *element, int channel, int make_on)	//Added channel parameter to function to select left or right side of WM8731 CODEC DAC
 {
     long min, max;
     snd_mixer_t *handle;
     snd_mixer_selem_id_t *sid;
     char *card = card_name;
+    
+    // Capture controls IF Gain
+    // Master controls Volume (of both channels)
+    
+    // printf("\nCard Name: %s, Element: %s, Value: %d\n", card_name, element, make_on);	// N3SB Hack
 
     snd_mixer_open(&handle, 0);
     snd_mixer_attach(handle, card);
@@ -109,33 +116,50 @@ void sound_mixer(char *card_name, char *element, int make_on)
     snd_mixer_selem_id_set_index(sid, 0);
     snd_mixer_selem_id_set_name(sid, element);
     snd_mixer_elem_t* elem = snd_mixer_find_selem(handle, sid);
-
-/*		if (elem)
+/*
+		if (elem)
 			puts("Element found.");	
-	*/
-    //find out if the his element is capture side or plaback
+*/	
+    // find out if the element is capture side or playback
     if(snd_mixer_selem_has_capture_switch(elem)){
-			//puts("this is a capture switch.");  
-	  	snd_mixer_selem_set_capture_switch_all(elem, make_on);
+	//		puts("this is a capture switch.");  
+			snd_mixer_selem_set_capture_switch_all(elem, make_on);
 		}
     else if (snd_mixer_selem_has_playback_switch(elem)){
-		//	puts("this is a playback switch.");
+	//		puts("this is a playback switch.");
 			snd_mixer_selem_set_playback_switch_all(elem, make_on);
 		}
     else if (snd_mixer_selem_has_playback_volume(elem)){
-			//puts("this is  playback volume");
+	//		puts("this is playback volume");
+	//		printf("channel: %d\n", channel);		// N3SB Debug Hack.
 			long volume = make_on;
-    	snd_mixer_selem_get_playback_volume_range(elem, &min, &max);
-    	snd_mixer_selem_set_playback_volume_all(elem, volume * max / 100);
+			snd_mixer_selem_get_playback_volume_range(elem, &min, &max);
+//			snd_mixer_selem_set_playback_volume_all(elem, volume * max / 100);
+// Here's the new code to permit controlling left and right channels independently within this function
+			if (channel == RX_VOLUME_CONTROL)
+			{
+	//			printf("Changing Receiver Volume: %d\n", volume);
+				snd_mixer_selem_set_playback_volume(elem, SND_MIXER_SCHN_FRONT_LEFT,  volume * max / 100);  // Receiver Volume - Left Channel
+			}
+			else if (channel == TX_GAIN_CONTROL)
+			{
+	//			printf("Changing Transmitter Gain: %d\n", volume);
+				snd_mixer_selem_set_playback_volume(elem, SND_MIXER_SCHN_FRONT_RIGHT,  volume * max / 100);  // Transmitter Gain - Right Channel
+			}
+			else
+			{
+				puts ("Error calling sound_mixer function - aborting.\n");
+				exit(0);
+			}		
     }	
     else if (snd_mixer_selem_has_capture_volume(elem)){
-		//	puts("this is a capture volume");
+	//		puts("this is a capture volume");
 			long volume = make_on;
-    	snd_mixer_selem_get_capture_volume_range(elem, &min, &max);
-    	snd_mixer_selem_set_capture_volume_all(elem, volume * max / 100);
+			snd_mixer_selem_get_capture_volume_range(elem, &min, &max);
+			snd_mixer_selem_set_capture_volume_all(elem, volume * max / 100);
     }
 		else if (snd_mixer_selem_is_enumerated(elem)){
-//			puts("TBD: this is an enumerated capture element");
+	//		puts("TBD: this is an enumerated capture element");
 			snd_mixer_selem_set_enum_item(elem, 0, make_on);
 		}
     snd_mixer_close(handle);
@@ -195,7 +219,7 @@ int sound_start_play(char *device){
 	//puts a playback handle into the pointer to the pointer
 	
 #if DEBUG > 0	
-	printf ("opening audio playback stream to %s\n", device); 
+	printf ("%s line %d: Opening audio playback stream to %s\n", __FILE__, __LINE__, device); 
 #endif
 	int e = snd_pcm_open(&pcm_play_handle, device, play_stream, 0);  // was SND_PCM_NONBLOCK
 	
@@ -306,7 +330,7 @@ int sound_start_play(char *device){
 #endif	
 
 	return 0;
-}
+}	// end of sound_start_play() function
 
 
 int sound_start_loopback_capture(char *device){
@@ -1003,8 +1027,13 @@ int loopback_loop(){
 We process the sound in a background thread.
 It will call the user-supplied function sound_process()  
 */
-void *sound_thread_function(void *ptr){
-	char *device = (char *)ptr;
+void *sound_thread_function(void *ptr){		// N3SB Hack - ptr now points to two sound devices separated by a space
+	char *device = (char *)ptr;					// Commented out N3SB 04-Feb-2024
+// Now we need to break the device string apart into the two devices strings passed in.
+
+	char *if_input_device = strtok(device, " ");
+	char *sound_output_device = strtok(NULL, " ");
+
 	struct sched_param sch;
 
 	//switch to maximum priority
@@ -1014,7 +1043,8 @@ void *sound_thread_function(void *ptr){
 // Open the PCM Capture Device
 	int i = 0;
 	for (i = 0; i < 10; i++){	
-		if (sound_start_capture(device) == 0)
+//		if (sound_start_capture(device) == 0)		// Commented out N3SB 04-Feb-2024
+		if (sound_start_capture(if_input_device) == 0)	// N3SB Hack - use newly defined input device parameter
 			break;
 		fprintf(stderr, "*Error opening PCM Capture device");
 		delay(1000); //wait for the sound system to bootup
@@ -1027,7 +1057,8 @@ void *sound_thread_function(void *ptr){
 
 // Open the PCM Play Device	
 	for (i = 0; i < 10; i++){
-		if (sound_start_play(device) == 0)
+//		if (sound_start_play(device) == 0)			// Commented out N3SB 04-Feb-2024
+		if (sound_start_play(sound_output_device) == 0)		// N3SB Hack - use newly defined output device parameter
 			break;
 		fprintf(stderr, "*Error opening PCM Play device");
 		delay(1000); //wait for the sound system to bootup
@@ -1086,13 +1117,26 @@ void *loopback_thread_function(void *ptr){
 	sound_stop();
 }
 
-int sound_thread_start(char *device){
+// int sound_thread_start(char *device){	// Commented out N3SB 04-Feb-2024
+int sound_thread_start(char *if_input_device, char *audio_output_device){   
 	q_init(&qloop, 10240);
  	qloop.stall = 1;
 
-	pthread_create( &sound_thread, NULL, sound_thread_function, (void*)device);
+// The if_input_device comes from the low frequency IF, and is the receiver signal data sampled by the CODEC
+// Changing this device would make no sense as it would effectively disconnect the analog receiver section from the digital processing section
+// The audio_output_device receives the filtered and demodulated audio to be sent to the speaker or headphones
+
+	// Ugly hack to pass both device names as one parameter. The device names are separated by a space.
+	char both_devices[50];
+	strcpy(both_devices, if_input_device);
+	strcat(both_devices, " ");
+	strcat(both_devices, audio_output_device);
+
+//	pthread_create( &sound_thread, NULL, sound_thread_function, (void*)device);	// Commented out N3SB 04-Feb-2024
+	pthread_create( &sound_thread, NULL, sound_thread_function, (void*)both_devices);	// N3SB Hack - Now passes two parameters
 	sleep(1);
-	pthread_create( &loopback_thread, NULL, loopback_thread_function, (void*)device);
+//	pthread_create( &loopback_thread, NULL, loopback_thread_function, (void*)device); // Commented out N3SB 04-Feb-2024
+	pthread_create( &loopback_thread, NULL, loopback_thread_function, (void*)if_input_device); // N3SB Hack - NOTE: This function appears to ignore the "device" parameter
 }
 
 void sound_thread_stop(){

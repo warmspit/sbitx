@@ -1318,7 +1318,8 @@ static void save_user_settings(int forced){
 	FILE *f = fopen(file_path, "w");
 	if (!f){
 		printf("Unable to save %s : %s\n", file_path, strerror(errno));
-		settings_updated = 0;  // stop repeated attempts to write if file cannot be opened.		
+		settings_updated = 0;  // stop repeated attempts to write if file cannot be opened.
+		last_save_at = now;
 		return;
 	}
 
@@ -2151,6 +2152,8 @@ static gboolean on_draw_event( GtkWidget* widget, cairo_t *cr, gpointer user_dat
 static gboolean on_resize(GtkWidget *widget, GdkEventConfigure *event, gpointer user_data) {
 	screen_width = event->width;
 	screen_height = event->height;
+	if (screen_height < 430)
+		screen_height = 430;
 //	gtk_container_resize_children(GTK_CONTAINER(window));
 //	gtk_widget_set_default_size(display_area, screen_width, screen_height);
 	layout_ui();	
@@ -2328,13 +2331,14 @@ void set_operating_freq(int dial_freq, char *response){
 	}
 	else if (!strcmp(split->value, "ON")){
 		if (!in_tx)
-			sprintf(freq_request, "r1:freq=%s", vfo_b->value);
+			sprintf(freq_request, "r1:freq=%s", vfo_a->value);	// was vfo_b->value
 		else
 			sprintf(freq_request, "r1:freq=%d", dial_freq);
 	}
 	else
+	{
 			sprintf(freq_request, "r1:freq=%d", dial_freq);
-
+	}
 	//get back to setting the frequency
 	sdr_request(freq_request, response);
 }
@@ -3651,7 +3655,7 @@ void set_radio_mode(char *mode){
 	char umode[10], request[100], response[100];
 	int i;
 
-	printf("Mode: %s\n", mode);
+	// printf("Mode: %s\n", mode);		// N3SB Hack - reducing clutter on the console
 	for (i = 0; i < sizeof(umode) - 1 && *mode; i++)
 		umode[i] = toupper(*mode++);
 	umode[i] = 0;
@@ -3877,7 +3881,7 @@ void ui_init(int argc, char *argv[]){
 
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   gtk_window_set_default_size(GTK_WINDOW(window), 800, 480);
-  gtk_window_set_default_size(GTK_WINDOW(window), screen_width, screen_height);
+  //gtk_window_set_default_size(GTK_WINDOW(window), screen_width, screen_height);
   gtk_window_set_title( GTK_WINDOW(window), "sBITX" );
 	gtk_window_set_icon_from_file(GTK_WINDOW(window), "/home/pi/sbitx/sbitx_icon.png", NULL);
 
@@ -4596,7 +4600,13 @@ int main( int argc, char* argv[] ) {
 
 	q_init(&q_remote_commands, 1000); //not too many commands
 	q_init(&q_tx_text, 100); //best not to have a very large q 
-	setup();
+
+// If a parameter was passed on the command line, use it as the audio output device	
+
+	if (argc > 1)
+		setup(argv[1]);
+	else
+		setup("plughw:0,0");	// otherwise use the default audio output device
 
 	rtc_sync();
 

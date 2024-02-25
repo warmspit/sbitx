@@ -47,5 +47,5 @@ void macro_get_keys(char *output);
 void update_log_ed();
 void write_call_log();
 time_t time_sbitx();
-
-#define VER_STR "sbitx-oz7bx v3.02.005"
+// 006 : Click fix by Beckman
+#define VER_STR "sbitx-oz7bx v3.02.006"

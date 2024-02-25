@@ -21,6 +21,7 @@
 #include "i2cbb.h"
 #include "si5351.h"
 #include "ini.h"
+int set_field(char *, char *);  // This should be moved to a .h file
 
 #define DEBUG 0
 
@@ -52,6 +53,10 @@ fftw_plan plan_spectrum;
 float spectrum_window[MAX_BINS];
 void set_rx1(int frequency);
 void tr_switch(int tx_on);
+float min_fft_level;
+int rx_gain_slow_count = 0;
+int rx_gain_fast_attack = 0;	// Flag to enable Fast IF Gain Changes
+int rx_gain_changed = 0;	// Flag to indicate a change in rx_gain has been called for
 
 // Wisdom Defines for the FFTW and FFTWF libraries
 // Options for WISDOM_MODE from least to most rigorous are FFTW_ESTIMATE, FFTW_MEASURE, FFTW_PATIENT, and FFTW_EXHAUSTIVE
@@ -60,7 +65,7 @@ void tr_switch(int tx_on);
 // if the Wisdom plans in the file were generated at the same or more rigorous level.
 #define WISDOM_MODE FFTW_MEASURE
 #define PLANTIME -1		// spend no more than plantime seconds finding the best FFT algorithm. -1 turns the platime cap off.
-char wisdom_file[] = "sbitx_wisdom.wis";
+char wisdom_file[] = "/home/pi/sbitx/data/sbitx_wisdom.wis";		// Moved to default data directory - N3SB
 
 fftw_complex *fft_out;		// holds the incoming samples in freq domain (for rx as well as tx)
 fftw_complex *fft_in;			// holds the incoming samples in time domain (for rx as well as tx) 
@@ -91,8 +96,6 @@ static int rx_pitch = 700; //used only to offset the lo for CW,CWR
 static int bridge_compensation = 100;
 static double voice_clip_level = 0.022;
 static int in_calibration = 1; // this turns off alc, clipping et al
-
-static int multicast_socket = -1;
 
 #define MUTE_MAX 6 
 static int mute_count = 50;
@@ -238,46 +241,6 @@ void spectrum_update(){
 		spectrum_plot[i] = y;
 	}
 }
-/*
-static int create_mcast_socket(){
-    int sockfd;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t client_addr_len = sizeof(client_addr);
-    char buffer[MAX_BUFFER_SIZE];
-
-    // Create a UDP socket
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-        perror("Error creating mcast socket");
-				return -1;
-    }
-
-    // Set up the server address structure
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    server_addr.sin_port = htons(MULTICAST_PORT);
-
-    // Bind the socket to the server address
-    if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
-        perror("Error binding mcast socket");
-        close(sockfd);
-				return -1;
-    }
-
-    // Set up the multicast group membership
-    struct ip_mreq mreq;
-    inet_pton(AF_INET, MULTICAST_ADDR, &(mreq.imr_multiaddr.s_addr));
-    mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-    if (setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == -1) {
-        perror("Error adding multicast group membership");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Listening for multicast on  %s:%d...\n", MULTICAST_ADDR, PORT);
-		return socketfd;
-}
-*/
 
 int remote_audio_output(int16_t *samples){
 	int length = q_length(&qremote);
@@ -325,6 +288,12 @@ void set_lpf_40mhz(int frequency){
 
 
 void set_rx1(int frequency){
+	static int last_frequency;		// Holds the last frequency set - used by the Auto IF Gain algorithm
+	if ((abs(frequency - last_frequency) > 1000000) && in_tx == 0)
+	{
+		rx_gain_fast_attack = 1;	// Kick the Auto IF Gain algorithm into fast attack mode if the frequency change is > 1 MHz
+	}
+	last_frequency = frequency;
 	if (frequency == freq_hdr)
 		return;
 	radio_tune_to(frequency);
@@ -633,7 +602,66 @@ void rx_process(int32_t *input_rx,  int32_t *input_mic,
 
 	// the spectrum display is updated
 	spectrum_update();
+	
+	// Make adjustments to IF Gain
+	min_fft_level = 10000;				// Set high before starting to find the lowest level in the fft_bins array
+		
+	for(i=1269; i<1800; i++)
+	{
+		if (fft_bins[i] < min_fft_level)
+		{
+			min_fft_level = fft_bins[i];	// new lowest level
+		}
+	}
 
+#define TARGET_FFT_LEVEL 0.015	
+#define FAST_MIN_FFT_LEVEL 0.008
+#define FAST_MAX_FFT_LEVEL 0.025
+
+	// Allow for fast IF Gain changes if the rx_gain_fast_attack flag is set (see set_rx1 function in this file)
+	
+	if (((min_fft_level < FAST_MIN_FFT_LEVEL) || (min_fft_level > FAST_MAX_FFT_LEVEL)) && (rx_gain_fast_attack == 1))
+	{
+		rx_gain_slow_count = 0;			// Reset slow IF Gain Loop counter
+		if (min_fft_level < FAST_MIN_FFT_LEVEL)
+		{
+			rx_gain += 5;		// Plan to increase up RX Gain 
+			rx_gain_changed = 1;	// Flag to request a big RX Gain change
+		}
+		else if (min_fft_level > FAST_MAX_FFT_LEVEL)
+		{
+			rx_gain -= 5;		// Plan to decrease RX Gain
+			rx_gain_changed = 1;	// Flag to request a big RX Gain change			
+		}
+	}
+	else
+	{
+		rx_gain_slow_count++;				// Only make fine adjustments to rx_gain every second.
+		if (rx_gain_slow_count > 106)		// Approx 106 blocks of samples per second
+		{
+			rx_gain_fast_attack = 0;		// If the IF gain is close to correct for a second, stop fast IF Gain changes.			
+			rx_gain_slow_count = 0;			
+			if (min_fft_level < TARGET_FFT_LEVEL)
+			{
+					rx_gain += 1;
+					rx_gain_changed = 1;	// Flag to request a small RX Gain change
+			}
+			else
+			{
+					rx_gain -= 1;
+					rx_gain_changed = 1;	// Flag to request a small RX Gain change
+			}
+		}
+	}
+	
+	if((!in_tx) && rx_gain_changed == 1)
+	{
+			// sound_mixer(audio_card, "Capture", rx_gain);		// This function call is not needed
+			char rx_gain_buff[8];
+			(void) sprintf(rx_gain_buff, "%d", rx_gain);
+			set_field("r1:gain", rx_gain_buff);
+			rx_gain_changed = 0;
+	}	
 
 	// ... back to the actual processing, after spectrum update  
 
@@ -932,15 +960,17 @@ void setup_audio_codec(){
 	strcpy(audio_card, "hw:0");
 
 	//configure all the channels of the mixer
-	sound_mixer(audio_card, "Input Mux", 0);
-	sound_mixer(audio_card, "Line", 1);
-	sound_mixer(audio_card, "Mic", 0);
-	sound_mixer(audio_card, "Mic Boost", 0);
-	sound_mixer(audio_card, "Playback Deemphasis", 0);
- 
-	sound_mixer(audio_card, "Master", 10);
-	sound_mixer(audio_card, "Output Mixer HiFi", 1);
-	sound_mixer(audio_card, "Output Mixer Mic Sidetone", 0);
+	sound_mixer(audio_card, "Input Mux", UNUSED_PARAMETER, 0);
+	sound_mixer(audio_card, "Line", UNUSED_PARAMETER, 1);
+	sound_mixer(audio_card, "Mic", UNUSED_PARAMETER, 0);
+	sound_mixer(audio_card, "Mic Boost", RX_VOLUME_CONTROL, 0);		// One of these is probably not required - N3SB
+	sound_mixer(audio_card, "Mic Boost", TX_GAIN_CONTROL, 0);		// One of these is probably not required - N3SB
+	sound_mixer(audio_card, "Playback Deemphasis", UNUSED_PARAMETER, 0);
+// Set a starting sound level 
+	sound_mixer(audio_card, "Master", RX_VOLUME_CONTROL, 10);					// Need to change - N3SB
+	sound_mixer(audio_card, "Master", TX_GAIN_CONTROL, 0);						// Now initializing TX Gain to 0 - N3SB
+	sound_mixer(audio_card, "Output Mixer HiFi", UNUSED_PARAMETER, 1);
+	sound_mixer(audio_card, "Output Mixer Mic Sidetone", UNUSED_PARAMETER, 0);
 
 }
 
@@ -1010,8 +1040,10 @@ void set_tx_power_levels(){
 	}
 //	printf("tx_amp is set to %g for %d drive\n", tx_amp, tx_drive);
 	//we keep the audio card output 'volume' constant'
-	sound_mixer(audio_card, "Master", 95);
-	sound_mixer(audio_card, "Capture", tx_gain);
+// Set a level for transmitting - right channel
+	sound_mixer(audio_card, "Master", TX_GAIN_CONTROL, 95);			// Need to change - N3SB
+	sound_mixer(audio_card, "Master", RX_VOLUME_CONTROL, rx_vol);	// Need to change - N3SB - return RX Volume to previous
+	sound_mixer(audio_card, "Capture", UNUSED_PARAMETER, tx_gain);
 	alc_level = 1.0;
 }
 
@@ -1112,8 +1144,9 @@ void tx_cal(){
 void tr_switch_de(int tx_on){
 		if (tx_on){
 			//mute it all and hang on for a millisecond
-			sound_mixer(audio_card, "Master", 0);
-			sound_mixer(audio_card, "Capture", 0);
+			sound_mixer(audio_card, "Master", TX_GAIN_CONTROL, 0);			// Need to change - N3SB
+			sound_mixer(audio_card, "Master", RX_VOLUME_CONTROL, 0);		// Added muting of RX - N3SB (May not be necessary)
+			sound_mixer(audio_card, "Capture", UNUSED_PARAMETER, 0);
 			delay(1);
 
 			//now switch of the signal back
@@ -1137,8 +1170,9 @@ void tr_switch_de(int tx_on){
 		else {
 			in_tx = 0;
 			//mute it all and hang on
-			sound_mixer(audio_card, "Master", 0);
-			sound_mixer(audio_card, "Capture", 0);
+			sound_mixer(audio_card, "Master", TX_GAIN_CONTROL, 0);			// Need to change - N3SB
+			sound_mixer(audio_card, "Master", RX_VOLUME_CONTROL, 0);		// Added muting of RX - N3SB (May not be necessary)
+			sound_mixer(audio_card, "Capture", UNUSED_PARAMETER, 0);
 			delay(1);
       fft_reset_m_bins();
 			mute_count = MUTE_MAX;
@@ -1159,8 +1193,9 @@ void tr_switch_de(int tx_on){
 			digitalWrite(TX_LINE, LOW);
 			delay(5); 
 			//audio codec is back on
-			sound_mixer(audio_card, "Master", rx_vol);
-			sound_mixer(audio_card, "Capture", rx_gain);
+// Set a level for receiver volume - left channel
+			sound_mixer(audio_card, "Master", RX_VOLUME_CONTROL, rx_vol);			// Need to change - N3SB
+			sound_mixer(audio_card, "Capture", UNUSED_PARAMETER, rx_gain);
 			spectrum_reset();
 			//rx_tx_ramp = 10;
 		}
@@ -1177,8 +1212,9 @@ void tr_switch_v2(int tx_on){
   		digitalWrite(LPF_D, LOW);
 
 			//mute it all and hang on for a millisecond
-			sound_mixer(audio_card, "Master", 0);
-			sound_mixer(audio_card, "Capture", 0);
+			sound_mixer(audio_card, "Master", TX_GAIN_CONTROL, 0);			// Need to change - N3SB
+			sound_mixer(audio_card, "Master", RX_VOLUME_CONTROL, 0);		// Added muting of RX - N3SB (May not be necessary)
+			sound_mixer(audio_card, "Capture", UNUSED_PARAMETER, 0);
 			delay(1);
 
 			//now switch of the signal back
@@ -1198,8 +1234,9 @@ void tr_switch_v2(int tx_on){
 		else {
 			in_tx = 0;
 			//mute it all and hang on
-			sound_mixer(audio_card, "Master", 0);
-			sound_mixer(audio_card, "Capture", 0);
+			sound_mixer(audio_card, "Master", TX_GAIN_CONTROL, 0);			// Need to change - N3SB
+			sound_mixer(audio_card, "Master", RX_VOLUME_CONTROL, 0);		// Added muting of RX - N3SB (May not be necessary)
+			sound_mixer(audio_card, "Capture", UNUSED_PARAMETER, 0);
 			delay(1);
       fft_reset_m_bins();
 			mute_count = MUTE_MAX;
@@ -1214,8 +1251,9 @@ void tr_switch_v2(int tx_on){
 			digitalWrite(TX_LINE, LOW);
 			delay(5); 
 			//audio codec is back on
-			sound_mixer(audio_card, "Master", rx_vol);
-			sound_mixer(audio_card, "Capture", rx_gain);
+// Set a level for receiver volume - left channel
+			sound_mixer(audio_card, "Master", RX_VOLUME_CONTROL, rx_vol);			// Need to change - N3SB
+			sound_mixer(audio_card, "Capture", UNUSED_PARAMETER, rx_gain);
 			spectrum_reset();
 			prev_lpf = -1;
 			set_lpf_40mhz(freq_hdr);
@@ -1233,11 +1271,11 @@ void tr_switch(int tx_on){
 /* 
 This is the one-time initialization code 
 */
-void setup(){
+void setup(char *audio_output_device){
+
+	printf("Audio Output Device is: %s\n", audio_output_device);
 
 	read_hw_ini();
-
-	//create_mcast_socket();
 
 	//setup the LPF and the gpio pins
 	pinMode(TX_LINE, OUTPUT);
@@ -1274,7 +1312,8 @@ void setup(){
 		sbitx_version = SBITX_V2;
 
 	setup_audio_codec();
-	sound_thread_start("plughw:0,0");
+// 	sound_thread_start("plughw:0,0");				// Commented out N3SB 04-Feb-2024
+	sound_thread_start("plughw:0,0", audio_output_device);	// N3SB hack to accept two device names - the IF input channel to the codec, and the audio output channel thru the codec to the speaker.
 
 	sleep(1); //why? to allow the aloop to initialize?
 
@@ -1418,15 +1457,24 @@ void sdr_request(char *request, char *response){
 	else if (!strcmp(cmd, "bridge")){
     bridge_compensation = atoi(value);
 	}
+	    
+    // Capture controls IF Gain
+    // Master controls Volume
+   
 	else if(!strcmp(cmd, "r1:gain")){
 		rx_gain = atoi(value);
 		if(!in_tx)
-			sound_mixer(audio_card, "Capture", rx_gain);
+			sound_mixer(audio_card, "Capture", UNUSED_PARAMETER, rx_gain);
 	}
 	else if (!strcmp(cmd, "r1:volume")){
 		rx_vol = atoi(value);
-		if(!in_tx)	
-			sound_mixer(audio_card, "Master", rx_vol);
+		if(!in_tx)
+		{
+//			printf("Audio Card: %s\n", audio_card);		// N3SB Hack
+// Set a level for receiver volume - left channel
+			sound_mixer(audio_card, "Master", RX_VOLUME_CONTROL, rx_vol);			// Need to change - N3SB
+//			sound_mixer("hw:0", "Master", rx_vol);
+		}
 	}
 	else if(!strcmp(cmd, "r1:high")){
     rx_list->high_hz = atoi(value);
