@@ -145,6 +145,67 @@ int logbook_count_dup(const char *callsign, int last_seconds){
 	return rec;
 }
 
+int logbook_get_grids(void (*f)(char *,int)) {
+	sqlite3_stmt *stmt;
+
+	char *statement = "SELECT exch_recv, COUNT(*) AS n FROM logbook "
+		"GROUP BY exch_recv order by exch_recv";
+
+	int res = sqlite3_prepare_v2(db, statement, -1, &stmt, NULL);
+	//printf("%s : %d\n", statement, res);
+	int cnt = 0;
+	char grid[10];
+	int n = 0;
+	while (sqlite3_step(stmt) == SQLITE_ROW) {
+		int num_cols = sqlite3_column_count(stmt);
+		for (int i = 0; i < num_cols; i++){
+			char const *col_name = sqlite3_column_name(stmt, i);
+			if (!strcmp(col_name, "exch_recv")) { 
+				strcpy(grid, sqlite3_column_text(stmt, i));
+			} else
+			if (!strcmp(col_name, "n")) { 
+				n = sqlite3_column_int(stmt, i);
+			}
+		}
+		f(grid,n);
+		cnt++;
+	}
+	sqlite3_finalize(stmt);
+	return cnt;
+}
+
+bool logbook_caller_exists(char * id) {
+	sqlite3_stmt *stmt;
+	char * statement = "SELECT EXISTS(SELECT 1 FROM logbook WHERE callsign_recv=?)";
+	int res = sqlite3_prepare_v2(db, statement, -1, &stmt, NULL);
+	if (res != SQLITE_OK) return false;
+	bool exists = false;
+	res = sqlite3_bind_text(stmt, 1, id, strlen(id), SQLITE_STATIC);
+	if (res == SQLITE_OK) {
+		res = sqlite3_step(stmt);
+		int i = sqlite3_column_int(stmt, 0);
+		exists = ( res == SQLITE_ROW && i != 0);
+	}
+	sqlite3_finalize(stmt);
+	return exists;
+}
+
+bool logbook_grid_exists(char *id) {
+	sqlite3_stmt *stmt;
+	char * statement = "SELECT EXISTS(SELECT 1 FROM logbook WHERE exch_recv=?)";
+	int res = sqlite3_prepare_v2(db, statement, -1, &stmt, NULL);
+	if (res != SQLITE_OK) return false;
+	bool exists = false;
+	res = sqlite3_bind_text(stmt, 1, id, strlen(id), SQLITE_STATIC);
+	if (res == SQLITE_OK) {
+		res = sqlite3_step(stmt);
+		int i = sqlite3_column_int(stmt, 0);
+		exists = ( res == SQLITE_ROW && i != 0);
+	}
+	sqlite3_finalize(stmt);
+	return exists;
+}
+
 int logbook_prev_log(const char *callsign, char *result){
 	char statement[1000], param[2000];
 	sqlite3_stmt *stmt;
@@ -155,7 +216,7 @@ int logbook_prev_log(const char *callsign, char *result){
 	strcpy(result, callsign);
 	strcat(result, ": ");
 	int res = sqlite3_prepare_v2(db, statement, -1, &stmt, NULL);
-	printf("%s : %d\n", statement, res);
+	//printf("%s : %d\n", statement, res);
 	int rec = 0;
 	while (sqlite3_step(stmt) == SQLITE_ROW) {
 		int i;
@@ -183,7 +244,7 @@ int logbook_prev_log(const char *callsign, char *result){
 					sprintf(param, "%d", sqlite3_column_type(stmt, i));
 					break;
 				}
-				printf("%s : %s\n", col_name, param);
+				//printf("%s : %s\n", col_name, param);
 				strcat(result, param);
 				if (!strcmp(col_name, "qso_date")) strcat(result, "_");
 				else strcat(result, " ");

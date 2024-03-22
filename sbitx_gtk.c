@@ -44,6 +44,7 @@ The initial sync between the gui values, the core radio values, settings, et al 
 #include "i2cbb.h"
 #include "webserver.h"
 #include "logbook.h"
+#include "hist_disp.h"
 
 #define FT8_START_QSO 1
 #define FT8_CONTINUE_QSO 0
@@ -166,6 +167,10 @@ struct font_style font_table[] = {
 	{FONT_TELNET, 0, 1, 0, "Mono", 11, CAIRO_FONT_WEIGHT_NORMAL, CAIRO_FONT_SLANT_NORMAL},
 	{FONT_FT8_QUEUED, 0.5, 0.5, 0.5, "Mono", 11, CAIRO_FONT_WEIGHT_NORMAL, CAIRO_FONT_SLANT_NORMAL},
 	{FONT_FT8_REPLY, 1, 0.6, 0, "Mono", 11, CAIRO_FONT_WEIGHT_NORMAL, CAIRO_FONT_SLANT_NORMAL},
+
+	{FF_MYCALL, 0.2, 1, 0, "Mono", 11, CAIRO_FONT_WEIGHT_NORMAL, CAIRO_FONT_SLANT_NORMAL},
+	{FF_CALLER, 1, 0.2, 0, "Mono", 11, CAIRO_FONT_WEIGHT_NORMAL, CAIRO_FONT_SLANT_NORMAL},
+	{FF_GRID,   1, 0.8, 0, "Mono", 11, CAIRO_FONT_WEIGHT_NORMAL, CAIRO_FONT_SLANT_NORMAL},
 };
 
 struct encoder enc_a, enc_b;
@@ -248,7 +253,6 @@ GtkWidget *window;
 GtkWidget *display_area = NULL;
 GtkWidget *text_area = NULL;
 extern void settings_ui(GtkWidget*p);
-extern int logbook_open();
 
 // these are callbacks called by the operating system
 static gboolean on_draw_event( GtkWidget* widget, cairo_t *cr, 
@@ -282,13 +286,35 @@ static int measure_text(cairo_t *gfx, char *text, int font_entry){
 	return (int) ext.x_advance;
 }
 
-static void draw_text(cairo_t *gfx, int x, int y, char *text, int font_entry){
+static struct font_style * set_style(cairo_t *gfx, int font_entry){
 	struct font_style *s  = font_table + font_entry;
-  cairo_set_source_rgb( gfx, s->r, s->g, s->b);
+  	cairo_set_source_rgb( gfx, s->r, s->g, s->b);
 	cairo_select_font_face(gfx, s->name, s->type, s->weight);
 	cairo_set_font_size(gfx, s->height);
+	return s;
+}
+static void draw_text(cairo_t *gfx, int x, int y, char *text, int font_entry){
+	struct font_style *s  = set_style(gfx, font_entry);
+
 	cairo_move_to(gfx, x, y + s->height);
-	cairo_show_text(gfx, text);
+	char * p = text;
+	char ch[2]; 
+	bool font_ready = true;
+	ch[1] = 0;
+	while (*p) {
+		ch[0]=*p;
+		if (!font_ready) {
+			s  = set_style(gfx, *p-'A');
+			font_ready = true;
+		}
+		else if (*p != '#' && font_ready ) {
+			cairo_show_text(gfx, ch);
+		} else if (*p == '#') {
+			font_ready = false;
+		}
+		p++;
+	}
+	
 }
 
 static void fill_rect(cairo_t *gfx, int x, int y, int w, int h, int color){
@@ -1036,12 +1062,21 @@ void write_to_remote_app(int style, char *text){
 	remote_write("}");
 }
 
-void write_console(int style, char *text){
-	char directory[200];	//dangerous, find the MAX_PATH and replace 200 with it
+void write_console(int style, char *raw_text){
+	/*char directory[200];	//dangerous, find the MAX_PATH and replace 200 with it
 	char *path = getenv("HOME");
 	strcpy(directory, path);
 	strcat(directory, "/sbitx/data/display_log.txt");
+    */
+    //tlog("write_console", text, style);
+	char *text;
+	char decorated[1000];
+	
+	if (strlen(raw_text) == 0)
+		return;
 
+	hd_decorate(style, raw_text, decorated);
+	text = decorated;
 	web_write(style, text);
 	//move to a new line if the style has changed
 	if (style != console_style){
@@ -1066,8 +1101,6 @@ void write_console(int style, char *text){
 		}
 	}
 
-	if (strlen(text) == 0)
-		return;
 
 /*
 	//write to the scroll
@@ -1078,8 +1111,9 @@ void write_console(int style, char *text){
 		pf = NULL;
 	}
 */	
-	write_to_remote_app(style, text);
+	write_to_remote_app(style, raw_text);
 
+	int console_line_max = MIN(console_cols, MAX_LINE_LENGTH);
 	while(*text){
 		char c = *text;
 		if (c == '\n')
@@ -1087,7 +1121,13 @@ void write_console(int style, char *text){
 		else if (c < 128 && c >= ' '){
 			char *p = console_stream[console_current_line].text;
 			int len = strlen(p);
-			if(len >= console_cols - 1){
+			if (c == HD_MARKUP_CHAR) {
+				console_line_max +=2;  // markup does not count
+				if (console_line_max > MAX_LINE_LENGTH-2) {
+					len = console_line_max; // force a new Line
+				}
+			}
+			if(len >= console_line_max - 1) {
 				//start a fresh line
 				console_init_next_line();
 				p = console_stream[console_current_line].text;
@@ -1107,7 +1147,7 @@ void write_console(int style, char *text){
 }
 
 void draw_console(cairo_t *gfx, struct field *f){
-	char this_line[1000];
+	//char this_line[1000];
 	int line_height = font_table[f->font_index].height; 	
 	int n_lines = (f->height / line_height) - 1;
 
@@ -1126,7 +1166,7 @@ void draw_console(cairo_t *gfx, struct field *f){
  	for (int i = 0; i <= n_lines; i++){
 		struct console_line *l = console_stream + start_line;
 		if (start_line == console_selected_line)
-			fill_rect(gfx, f->x, y+1, f->width, font_table[l->style].height+1, SELECTED_LINE);
+			fill_rect(gfx, f->x, y+1, f->width, font_table[l->style].height+1, SELECTED_LINE);	
 		draw_text(gfx, f->x+1, y, l->text, l->style);
 		start_line++;
 		y += line_height;
@@ -1145,6 +1185,7 @@ int do_console(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 
 	switch(event){
 		case FIELD_DRAW:
+		    //tlog("do_console", "draw", n_lines);
 			draw_console(gfx, f);
 			return 1;
 		break;
@@ -1160,8 +1201,9 @@ int do_console(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 		break;
 		case GDK_BUTTON_RELEASE:
 			if (!strcmp(get_field("r1:mode")->value, "FT8")){
-				char ft8_message[100], ft8_response[100];
-				strcpy(ft8_message, console_stream[console_selected_line].text);
+				char ft8_message[300];
+				//strcpy(ft8_message, console_stream[console_selected_line].text);
+				hd_strip_decoration(ft8_message, console_stream[console_selected_line].text);
 				ft8_process(ft8_message, FT8_START_QSO);
 			}
 			f->is_dirty = 1;
@@ -2962,6 +3004,7 @@ void tx_on(int trigger){
 	}
 
 	struct field *f = get_field("r1:mode");
+	
 	if (f){
 		if (!strcmp(f->value, "CW"))
 			tx_mode = MODE_CW;
@@ -2988,7 +3031,8 @@ void tx_on(int trigger){
 		struct field *freq = get_field("r1:freq");
 		set_operating_freq(atoi(freq->value), response);
 		update_field(get_field("r1:freq"));
-		printf("TX\n");
+		//printf("TX\n");
+		//tlog("tx_on", freq->value, trigger);
 	}
 
 	tx_start_time = millis();
@@ -3007,7 +3051,8 @@ void tx_off(){
 		struct field *freq = get_field("r1:freq");
 		set_operating_freq(atoi(freq->value), response);
 		update_field(get_field("r1:freq"));
-		printf("RX\n");
+		//printf("RX\n");
+		//tlog("tx_off", response, millis()-tx_start_time);
 	}
 	sound_input(0); //it is a low overhead call, might as well be sure
 }
@@ -4283,7 +4328,7 @@ int get_ft8_callsign(const char* message, char* other_callsign) {
 	len = (int)strlen(message);
 	const char* mycall = field_str("MYCALLSIGN");
 	while (i <= len) {
-		if (message[i] == ' ' || message[i] == '\0' || j >= 31) { 
+		if (message[i] == ' ' || message[i] == '\0' || j >= 31) {
 			i++;
 			while (i < len && message[i] == ' ') { i++; }
 			if (m > 3) {
@@ -4305,7 +4350,7 @@ int get_ft8_callsign(const char* message, char* other_callsign) {
 			fields[m][j++] = message[i];
 			i++;
 		}
-		
+
 		if (m > 4) {
 			return -2; // to many fields
 		}
@@ -4314,18 +4359,21 @@ int get_ft8_callsign(const char* message, char* other_callsign) {
 		return -3; // to few fields
 	}
 	if (!strcmp(fields[0], "CQ")) {
-		if (m == 4) { 
+		if (m == 4) {
 			i = 2; // CQ xx callsign grid
 		}
-		else { 
+		else {
 			i = 1; // CQ callsign grid
 		}
 	}
 	else if (!strcmp(fields[0], mycall)) {
 		i = 1; // mycallsign callsign
 	}
+	else if (!strcmp(fields[1], mycall)) {
+		i = 0; // mycallsign callsign
+	}
 	else {
-		i = 0; // callsign other
+		i = 1; // callsign other -the one we hear
 	}
 	strcpy(other_callsign, fields[i]);
 	return m;
@@ -4354,13 +4402,6 @@ void pre_ft8_check(char* message) {
 
 		if (cnt == 0 || equal_last_check == 0) {
 			ft8_process(message, FT8_START_QSO);
-		} else {
-			field_set("CALL", other_callsign); // make it easy to make a call
-			field_set("SENT", "");
-			field_set("EXCH", "");
-			field_set("RECV", "");
-			field_set("NR", "");
-		}
 	}
 }
 
@@ -4613,6 +4654,9 @@ int main( int argc, char* argv[] ) {
 	struct field *f;
 	f = active_layout;
 
+	// Init grid visited bitmap
+	hd_createWorldGridMap();
+
 	//initialize the modulation display
 
 	tx_mod_max = get_field("spectrum")->width;
@@ -4629,7 +4673,7 @@ int main( int argc, char* argv[] ) {
 
 	strcpy(vfo_a_mode, "USB");
 	strcpy(vfo_b_mode, "LSB");
-	set_field("#mycallsign", "VU2LCH");
+	set_field("#mycallsign", "NOBODY");
 	//vfo_a_freq = 14000000;
 	//vfo_b_freq = 7000000;
 	
@@ -4699,4 +4743,23 @@ int main( int argc, char* argv[] ) {
   
   return 0;
 }
+
+void tlog(char * id, char * text, int p) {
+	#define SL 1000
+	char s[SL];
+	int n = strlen(text);
+	if (n > SL) n = SL-2;
+	if (text[n-1] == '\n')  n--;
+	strncpy(s, text, n);
+	s[n] = '\0';
+	printf("%08d %s: %s %d\n", millis(), id, s, p);
+}
+
+/*
+void tlogf(char * format, ...) {
+	printf("%08d ", millis());
+	printf(format, __VA_ARGS__);
+	println();
+}
+*/
 

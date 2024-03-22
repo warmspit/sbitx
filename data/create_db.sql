@@ -13,3 +13,6 @@ create table logbook (
 	tx_id	TEXT DEFAULT "",
 	comments TEXT DEFAULT ""
 );
+CREATE INDEX gridIx ON logbook (exch_recv);
+CREATE INDEX callIx ON logbook (callsign_recv);
+
