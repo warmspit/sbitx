@@ -4402,6 +4402,7 @@ void pre_ft8_check(char* message) {
 
 		if (cnt == 0 || equal_last_check == 0) {
 			ft8_process(message, FT8_START_QSO);
+		}
 	}
 }
 
@@ -4590,23 +4591,23 @@ void cmd_exec(char *cmd){
 		for (char *p = exec; *p; p++)
 			*p =  toupper(*p);
 		struct field *f = get_field_by_label(exec);
-		if (f){
+		if (f) {
 			//convert all the letters to uppercase
 			for(char *p = args; *p; p++)
 				*p = toupper(*p);
-			if(set_field(f->cmd, args)){
+			if(set_field(f->cmd, args)) {
 				write_console(FONT_LOG, "Invalid setting:");
-      } else {
-				//this is an extract from focus_field()
-				//it shifts the focus to the updated field
-				//without toggling/jumping the value 
-				struct field *prev_hover = f_hover;
-				struct field *prev_focus = f_focus;
-				f_focus = NULL;
-				f_focus = f_hover = f;
-				focus_since = millis();
-				update_field(f_hover);
-      }
+			} else {
+						//this is an extract from focus_field()
+						//it shifts the focus to the updated field
+						//without toggling/jumping the value 
+						struct field *prev_hover = f_hover;
+						struct field *prev_focus = f_focus;
+						f_focus = NULL;
+						f_focus = f_hover = f;
+						focus_since = millis();
+						update_field(f_hover);
+			}
 		}
 	}
 	save_user_settings(0);

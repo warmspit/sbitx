@@ -61,4 +61,5 @@ void tlog(char * id, char * text, int p);
 // 008 : Callsign lookup, and grid visited coloring
 // 009 : FT8 EXCH field safeguard
 // 010 : FT8 callsign and grid decoration
-#define VER_STR "sbitx-oz7bx v3.02.0010"
+// 011 : Missing { and FT8 CQ click error fixed 
+#define VER_STR "sbitx-oz7bx v3.02.0011"

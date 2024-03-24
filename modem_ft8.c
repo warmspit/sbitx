@@ -777,7 +777,7 @@ void ft8_on_start_qso(char *message){
 			field_set("EXCH", m3);
 			field_set("SENT", signal_strength);
 		}
-		sprintf(reply_message, "#J%s#E %s %s", call, mycall, mygrid);
+		sprintf(reply_message, "%s %s %s", call, mycall, mygrid);
 	}
 	//whoa, someone cold called us
 	else if (!strcmp(m1, mycall)){
