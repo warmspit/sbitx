@@ -615,6 +615,8 @@ struct field main_controls[] = {
     "", 100,99999,100, 0},
   { "mouse_pointer", NULL, 1000, -1000, 50, 50, "MP", 40, "LEFT", FIELD_SELECTION, FONT_FIELD_VALUE,
     "BLANK/LEFT/RIGHT/CROSSHAIR", 0,0,0,0},
+  { "#selband", NULL, 1000, -1000, 50, 50, "SELBAND", 40, "", FIELD_NUMBER, FONT_FIELD_VALUE,
+    "", 0,73,1, 0},
 
 	// Settings Panel
 	{"#mycallsign", NULL, 1000, -1000, 400, 149, "MYCALLSIGN", 70, "CALL", FIELD_TEXT, FONT_SMALL, 
@@ -966,7 +968,7 @@ void web_add_string(char *string){
 
 void  web_write(int style, char *data){
 	char tag[20];
-
+    //int n1 = q_length(&q_web);
 	switch(style){
 		case FONT_FT8_REPLY:
 		case FONT_FT8_RX:
@@ -996,7 +998,6 @@ void  web_write(int style, char *data){
 		default:
 			strcpy(tag, "LOG");
 	}
-
 	web_add_string("<");
 	web_add_string(tag);		
 	web_add_string(">");
@@ -1045,6 +1046,7 @@ void  web_write(int style, char *data){
 	web_add_string("</");
 	web_add_string(tag);
 	web_add_string(">");
+	//int n2 = q_length(&q_web); tlog("web_write", data, n2-n1);
 }
 
 int console_init_next_line(){
@@ -3648,6 +3650,9 @@ int  web_get_console(char *buff, int max){
 
 	if (q_length(&q_web) == 0)
 		return 0;
+	//sprintf(buff,"underflow %d  overflow %d  max_q %d len %d",
+	//	q_web.underflow, q_web.overflow, q_web.max_q, q_length(&q_web));
+	//tlog("web_get_console", buff, max);
 	strcpy(buff, "CONSOLE ");
 	buff += strlen("CONSOLE ");
 	for (i = 0; (c = q_read(&q_web)) && i < max; i++){
@@ -3922,7 +3927,7 @@ void ui_init(int argc, char *argv[]){
 	screen_height = gdk_screen_height();
 #pragma pop
 */
-	q_init(&q_web, 1000);
+	q_init(&q_web, 5000);
 
   window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   gtk_window_set_default_size(GTK_WINDOW(window), 800, 480);
@@ -4055,7 +4060,10 @@ void change_band(char *request){
 	field_set("FREQ", buff);
 	field_set("MODE", mode_name[band_stack[new_band].mode[stack]]);	
 	update_field(get_field("r1:mode"));
-
+	sprintf(buff, "%d", new_band*10+stack);
+	set_field("#selband", buff);
+	q_empty(&q_web);// inserted by llh 
+    console_init(); // inserted by llh 
   // this fixes bug with filter settings not being applied after a band change, not sure why it's a bug - k3ng 2022-09-03
 //  set_field("r1:low",get_field("r1:low")->value);
 //  set_field("r1:high",get_field("r1:high")->value);
@@ -4655,9 +4663,8 @@ int main( int argc, char* argv[] ) {
 	struct field *f;
 	f = active_layout;
 
-	// Init grid visited bitmap
-	hd_createWorldGridMap();
-
+	hd_createGridList();
+	
 	//initialize the modulation display
 
 	tx_mod_max = get_field("spectrum")->width;
@@ -4750,7 +4757,7 @@ void tlog(char * id, char * text, int p) {
 	char s[SL];
 	int n = strlen(text);
 	if (n > SL) n = SL-2;
-	if (text[n-1] == '\n')  n--;
+	if (n > 0 && text[n-1] == '\n')  n--;
 	strncpy(s, text, n);
 	s[n] = '\0';
 	printf("%08d %s: %s %d\n", millis(), id, s, p);

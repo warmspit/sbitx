@@ -751,7 +751,9 @@ int ft8_message_tokenize(char *message){
 void ft8_on_start_qso(char *message){
 	modem_abort();
 	tx_off();
-	call_wipe();
+	if (strcmp(call, m1)) { // only wipe if new call
+		call_wipe();
+	}
 
 	//for cq message that started on 0 or 30th second, use the 15 or 45 and
 	//vice versa
@@ -781,12 +783,12 @@ void ft8_on_start_qso(char *message){
 	}
 	//whoa, someone cold called us
 	else if (!strcmp(m1, mycall)){
-		char cur_call[10];
+		char cur_call[20];
 	    get_field_value_by_label("CALL", cur_call);
 		field_set("CALL", m2);
 		field_set("SENT", signal_strength);
 		//they might have directly sent us a signal report
-		if (isalpha(m3[0]) && isalpha(m3[1] && strncmp(m3,"RR",2)==0)){ // R- RR are not EXCH
+		if (isalpha(m3[0]) && isalpha(m3[1]) && strncmp(m3,"RR",2)!=0){ // R- RR are not EXCH
 			field_set("EXCH", m3);
 			sprintf(reply_message, "%s %s %s", call, mycall, signal_strength);
 		}
@@ -800,7 +802,11 @@ void ft8_on_start_qso(char *message){
 	}
 	else { //we are breaking into someone else's qso
 		field_set("CALL", m2);
-		field_set("EXCH", "");
+		if (isalpha(m3[0]) && isalpha(m3[1]) && strncmp(m3,"RR",2)!=0){ // R- RR are not EXCH
+			field_set("EXCH", m3); // the gridId is valid - use it
+		} else {
+			field_set("EXCH", "");
+		}
 		field_set("SENT", signal_strength);
 		sprintf(reply_message, "%s %s %s", call, mycall, mygrid); //signal_strength);
 	}

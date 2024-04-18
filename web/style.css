@@ -483,20 +483,15 @@ select, select option, input {
 	display: inline-block;
 	font-family: courier, monspace-ui, monospace;
 	font-size: 10pt;
-	height: 235px;
-	width: 400px;/* 290px; */
+	height: 386px;
+	width: 320px;
 	overflow: auto;
 	border: none;
-}
-.grids-bmp {
-	display: inline-block;
-	overflow: auto;
-	border: none;	
 }
 
 /* styling the FT8 list */
 .ft8-label {
-	font-size: 7pt;
+	font-size: 9pt;
 	display: inline-block;
 	width: 22ch;
 }
@@ -509,8 +504,11 @@ select, select option, input {
 .ft8-old-grid {
 	color: rgb(47, 178, 101);
 }
-.ft8-new-grid {
+.ft8-new-caller {
 	color: rgb(217, 90, 55);
+}
+.ft8-new-grid {
+	color: rgb(247, 247, 38);
 }
 .wsjtx-message-queued {
 	color: rgb(184, 123, 38);
@@ -620,10 +618,10 @@ body {
 	color: white;
 	vertical-align:top;
 	display: inline-block;
-	line-height: 0;
+	/*line-height: 0;*/
 /*	margin-top: 1px;
 	margin-bottom: 1px;*/
-	padding: 7 0 7 0;
+	/*padding: 7 0 7 0;*/
 }
 
 .sbitxv3-macro {
@@ -714,9 +712,11 @@ body {
 }
 
 .linear-slider{
-	appearance: slider-vertical;
+	/*appearance: slider-vertical;*/
 	height: 90px;
 	width: 40px;
+	writing-mode: vertical-lr; 
+	direction: rtl
 }
 
 .macro-btn {
@@ -846,6 +846,31 @@ body {
 	margin-left: 200px;
 	margin-top:90px;
 	vertical-align: top;
-	zindex = -1; // this is to allow the restore button to show through
+	z-index: -1; /* this is to allow the restore button to show through ?? */
+}
+
+/* Tooltip css */
+.tooltip {
+	position: relative;
+	display: inline-block;
+	border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+  }
+  
+.tooltip .tooltiptext {
+	visibility: hidden;
+	background-color: darkgreen;
+	color: #fff;
+	text-align: center;
+	padding: 5px 0;
+	border-radius: 4px;
+	position: absolute;
+	left: 0px;
+    top: -24px;
+    font-size: small;
+	z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+	visibility: visible;
 }
 

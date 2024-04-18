@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "bm_bmp.h"
+#include <math.h>
 #include "sdr_ui.h"
 #include "logbook.h"
 #include "hist_disp.h"
@@ -16,91 +16,30 @@ bool isDigit(char c) {
     return c >= '0' && c <= '9';
 }
 
-bool checkGridId(struct BM_BMP* pBmp, char* gridId, uint16_t clrIx) {
-    if (isLetter(gridId[0]) && isLetter(gridId[1]) &&
-        isDigit(gridId[2]) && isDigit(gridId[3])) {
-        int col = (gridId[0] - 'A') * 10 + (gridId[2] - '0');
-        int row = (gridId[1] - 'A') * 10 + (gridId[3] - '0');
-        if (pBmp->infohdr.biWidth > 180) {
-            col = col * 2;
-        }
-        setPixel(pBmp, col, row, clrIx);
-        return true;
-    }
-    //printf("Illeagal gridId %s \n", gridId);
-    return false;
+bool isValidGridId(char* gridId) {
+	return strlen(gridId) == 4 && 
+		isLetter(gridId[0]) && isLetter(gridId[1]) &&
+        isDigit(gridId[2]) && isDigit(gridId[3]);
 }
 
-static struct BM_BMP* pOneBmp;
-static uint16_t oneClrIx;
 static FILE* onfFout;
 
-void addGrid(char * gridId, int cnt) {
-    if (pOneBmp != NULL) {
-        if (checkGridId(pOneBmp, gridId, oneClrIx)) {
-            if (onfFout != NULL) fwrite(gridId,1,4,onfFout);
+void addGridToFile(char * gridId, int cnt) {
+    if (isValidGridId(gridId)) {
+		if (onfFout != NULL) {
+				fwrite(gridId,1,4,onfFout);
         }
     }
 }
 
-int readLoggedGrids(struct BM_BMP* pBmp, uint16_t clrIx)
-{
-    pOneBmp = pBmp;
-    oneClrIx = clrIx;
-    logbook_get_grids(addGrid);
-    pOneBmp = NULL;
-}
-
-void hd_createWorldGridMap() {
-    struct BM_BMP* pBmp = bm_load("./web/gridworld.bmp");
-    
-	if (pBmp != NULL) {
-        onfFout = fopen("./web/grids.txt", "wb");
+void hd_createGridList() {
+	 onfFout = fopen("./web/grids.txt", "wb");
 
 		logbook_open();
-		readLoggedGrids(pBmp, 15);
-		bm_save(pBmp, "./web/b360w.bmp");
-		bm_free(pBmp);
+		logbook_get_grids(addGridToFile);
 
         fwrite("\0\0", 1, 2, onfFout);
         if (onfFout != NULL) fclose(onfFout);
-	}
-    
-}
-
-int readGrids(struct BM_BMP* pBmp, char* filename, uint16_t clrIx) {
-    FILE* fptr;
-
-#pragma warning(suppress : 4996).
-    fptr = fopen(filename, "rb");
-    if (fptr == NULL)
-    {
-        printf("Cannot open file \n");
-        exit(0);
-    }
-
-    // Read contents from file 
-    char c = fgetc(fptr);
-    char cs[10];
-    int i = 0;
-    while (c != EOF)
-    {
-        if (c != '\n' && c != '\r') {
-            cs[i++] = c;
-            if (i == 4) {
-                cs[i] = 0;
-                if (!checkGridId(pBmp, cs, clrIx)) {
-                    break;
-                }
-                i = 0;
-            }
-        }
-        printf("%c", c);
-        c = fgetc(fptr);
-    }
-
-    fclose(fptr);
-    return 0;
 }
 
 struct hd_message_struct {
@@ -152,6 +91,7 @@ int ff_lookup_style(char* id, int style, int style_default) {
 	{
 	case FF_CALLER:
 		return logbook_caller_exists(id) ? style_default : style;
+		// return style; // test skipping log lookup
 		break;
 
 	case FF_GRID: {
@@ -161,6 +101,7 @@ int ff_lookup_style(char* id, int style, int style_default) {
         	isDigit(id[2]) && isDigit(id[3]));
 			
 			return (!id_ok || logbook_grid_exists(id)) ? style_default : style;
+			//return (!id_ok) ? style_default : style; // test skipping log lookup
 		}
 		break;
 

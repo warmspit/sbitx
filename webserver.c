@@ -10,6 +10,7 @@
 #include "sdr.h"
 #include "sdr_ui.h"
 #include "logbook.h"
+#include "hist_disp.h"
 
 static const char *s_listen_on = "ws://0.0.0.0:8080";
 static char s_web_root[1000];
@@ -22,10 +23,10 @@ static void web_respond(struct mg_connection *c, char *message){
 
 static void get_console(struct mg_connection *c){
 	char buff[2100];
-	
 	int n = web_get_console(buff, 2000);
 	if (!n)
 		return;
+	//char first20 [21]; strncpy(first20, buff, 20); first20[20] = 0;  tlog("get_console", first20, n);
 	mg_ws_send(c, buff, strlen(buff), WEBSOCKET_OP_TEXT);
 }
 
@@ -60,7 +61,9 @@ static void do_login(struct mg_connection *c, char *key){
 		printf("passkey didn't match. Closing socket\n");
 		return;
 	}
-	
+
+	hd_createGridList(); // llh: make the list up to date at the beginning of a session
+
 	sprintf(session_cookie, "%x", rand());
 	char response[100];
 	sprintf(response, "login %s", session_cookie);

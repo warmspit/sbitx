@@ -7,13 +7,43 @@ FT8 List Web App
 
 # Improvements and fixes that I find useful.
 
-(This branch is at this commit > 5 commits ahead of afarhan/sbitx:main from 2024 02 13.)
+(This branch is at this more than 6 commits ahead of afarhan/sbitx:main from 2024 02 13.)
 
 ## Hardware
 
 The hardware I use is sBitx V2 upgraded to V3 as described in the document:
 sbitxv3 PA changes and measurements
 https://docs.google.com/document/d/1HvpgnS6zuPcygxmB6lvFZztqSGPLlWYzVGHhytWvQG4/edit
+
+## 2024 04 18:
+
+sbitx-oz7bx v3.02.0016
+
+Improvements in this version:
+
+### Web App in FT8 Mode: World Map with grids plot.   
+A Robinson projection world map is displayed to the right* of the two FT8 Lists.
+*(if the window is wide enough )  
+The default "seen" behaviour is that all grids found in the current FT8 Lists are plotted.
+That means only grids seen during the current web session. (The lists can grow very large and maybee to large!). If the App is reloaded the "seen" plot is cleared.  
+Grids that has been logged are displayed in darkgreen, unlogged grids in yellow and grids logged during the current session are displayed in red. The plot can be toggeled on/off with the "Seen" button.  
+The "Logged" button toggles display of all logged grids in green on/of.  
+The map can be zoomed by the slider or the mouse wheel. Map position change is done by left mouse drag.
+Mouseover on the map causes display of longitude, latitude and grid.  
+Alt click in FT8 Lists causes caller lookup in qrz widow.
+
+### FT8 mode: Only wipe QSO info if new call  
+The QSO info fields are not cleared on actions (macro or FT8 List click) if the called station matches the CALL field (grid field might be filled). 
+
+### FT8 mode: The FT8 lists are cleared when changing band.  
+The old FT8 messages from another band was confusing.
+
+### FT8 mode: Web message queue overrun fixed.  
+The size of the web message queue (q_web) size was to small (even without my extra markup) and caused missing FT8 messages in the web FT8 lists.
+
+### Web App: Band selector "radio" buttons.  
+The band selector buttons now behaves like radio buttons and indicates the selected band plus current memory slot (1 -4).
+
 
 ## 2024 03 22:
 

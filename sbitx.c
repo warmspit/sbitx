@@ -553,6 +553,13 @@ void my_fftw_execute(fftw_plan f){
 	fftw_execute(f);
 }
 
+void auto_if_gain_clear() {
+	rx_gain_slow_count = 0;
+	rx_gain_fast_attack = 0;	// Flag to enable Fast IF Gain Changes
+	rx_gain_changed = 0;
+}
+static int rx_tick = 0;
+static char bufDebugTick[200];
 
 //TODO : optimize the memory copy and moves to use the memcpy
 void rx_process(int32_t *input_rx,  int32_t *input_mic, 
@@ -560,7 +567,7 @@ void rx_process(int32_t *input_rx,  int32_t *input_mic,
 {
 	int i, j = 0;
 	double i_sample, q_sample;
-
+    rx_tick++;
 	//STEP 1: first add the previous M samples to
 	for (i = 0; i < MAX_BINS/2; i++)
 		fft_in[i]  = fft_m[i];
@@ -617,7 +624,7 @@ void rx_process(int32_t *input_rx,  int32_t *input_mic,
 #define TARGET_FFT_LEVEL 0.015	
 #define FAST_MIN_FFT_LEVEL 0.008
 #define FAST_MAX_FFT_LEVEL 0.025
-
+    //if (rx_tick % 100 == 0) { sprintf(bufDebugTick,"%9.2f ",min_fft_level); tlog("rx_tick", bufDebugTick, rx_gain);}
 	// Allow for fast IF Gain changes if the rx_gain_fast_attack flag is set (see set_rx1 function in this file)
 	
 	if (((min_fft_level < FAST_MIN_FFT_LEVEL) || (min_fft_level > FAST_MAX_FFT_LEVEL)) && (rx_gain_fast_attack == 1))
@@ -1463,8 +1470,10 @@ void sdr_request(char *request, char *response){
    
 	else if(!strcmp(cmd, "r1:gain")){
 		rx_gain = atoi(value);
-		if(!in_tx)
+		if(!in_tx) {
+			auto_if_gain_clear();  // by oz7bx
 			sound_mixer(audio_card, "Capture", UNUSED_PARAMETER, rx_gain);
+		}
 	}
 	else if (!strcmp(cmd, "r1:volume")){
 		rx_vol = atoi(value);

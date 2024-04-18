@@ -61,5 +61,10 @@ void tlog(char * id, char * text, int p);
 // 008 : Callsign lookup, and grid visited coloring
 // 009 : FT8 EXCH field safeguard
 // 010 : FT8 callsign and grid decoration
-// 011 : Missing { and FT8 CQ click error fixed 
-#define VER_STR "sbitx-oz7bx v3.02.0011"
+// 011 : FT8 CQ click error fixed
+// 012 : FT8 click non CQ fixed
+// 013 : FT8 web_q overflow fixed
+// 014 : Web GridMap v1, and cur selected Band/Store shown
+// 015 : Web Robinson zoom GridMap, mouseover grid info, Logged Seen btn
+// 016 : Cleanout and prepare for github sbitx-oz7bx v3.02.0016
+#define VER_STR "sbitx-oz7bx v3.02.0016"
