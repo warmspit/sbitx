@@ -68,6 +68,7 @@ fftw_complex *fft_m;			// holds previous samples for overlap and discard convolu
 fftw_plan plan_fwd, plan_tx;
 int bfo_freq = 40035000;
 int freq_hdr = -1;
+int si570_xtal = 0;
 
 static double volume 	= 100.0;
 static int tx_drive = 40;
@@ -729,7 +730,6 @@ void read_power(){
 	fwdpower = (fwdvoltage * fwdvoltage)/400;
 
 	int rf_v_p2p = (fwdvoltage * 126)/400;
-//	printf("rf volts: %d, alc %g, %d watts ", rf_v_p2p, alc_level, fwdpower/10);	
 	if (rf_v_p2p > 135 && !in_calibration){
 		alc_level *= 135.0 / (1.0 * rf_v_p2p);
 		printf("ALC tripped, to %d percent\n", (int)(100 * alc_level));
@@ -777,7 +777,7 @@ void tx_process(
 
 		if (r->mode == MODE_2TONE)
 			i_sample = (1.0 * (vfo_read(&tone_a) 
-										+ vfo_read(&tone_b))) / 50000000000.0;
+										+ vfo_read(&tone_b) )) / 50000000000.0;
 		else if (r->mode == MODE_CALIBRATE)
 			i_sample = (1.0 * (vfo_read(&tone_a))) / 25000000000.0;
 		else if (r->mode == MODE_CW || r->mode == MODE_CWR || r->mode == MODE_FT8)
@@ -965,7 +965,6 @@ static int hw_settings_handler(void* user, const char* section,
 {
   char cmd[1000];
   char new_value[200];
-		
 
 	if (!strcmp(name, "f_start"))
 		band_power[hw_init_index].f_start = atoi(value);
@@ -976,6 +975,8 @@ static int hw_settings_handler(void* user, const char* section,
 
 	if (!strcmp(name, "bfo_freq"))
 		bfo_freq = atoi(value);
+	if (!strcmp(name, "si570_xtal"))
+		si570_xtal = atoi(value);
 }
 
 static void read_hw_ini(){

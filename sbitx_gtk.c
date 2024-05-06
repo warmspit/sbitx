@@ -42,10 +42,12 @@ The initial sync between the gui values, the core radio values, settings, et al 
 #include "i2cbb.h"
 #include "webserver.h"
 #include "logbook.h"
+#include "oled.h"
 
 #define FT8_START_QSO 1
 #define FT8_CONTINUE_QSO 0
 void ft8_process(char *received, int operation);
+void change_band(char *request);
 
 /* command  buffer for commands received from the remote */
 struct Queue q_remote_commands;
@@ -196,6 +198,8 @@ int console_current_line = 0;
 int	console_selected_line = -1;
 struct Queue q_web;
 
+//oled stuf
+static uint8_t oled_available = 0;
 
 // event ids, some of them are mapped from gtk itself
 #define FIELD_DRAW 0
@@ -1065,17 +1069,8 @@ void write_console(int style, char *text){
 	if (strlen(text) == 0)
 		return;
 
-/*
-	//write to the scroll
-	FILE *pf = fopen(directory, "a");
-	if (pf){
-		fwrite(text, strlen(text), 1, pf);
-		fclose(pf);
-		pf = NULL;
-	}
-*/	
 	write_to_remote_app(style, text);
-
+	oled_console(style, text);
 	while(*text){
 		char c = *text;
 		if (c == '\n')
@@ -2039,22 +2034,22 @@ static void layout_ui(){
 			field_move("SPECTRUM", 360, y1, x2-365, 60);
 			field_move("WATERFALL", 360, y1+60, x2-365, y2-y1-115);
 			// first line below the decoder/waterfall
-			field_move("ESC", 5, y2-50, 40, 45);
-			field_move("F1", 50, y2-50, 45, 45);
-			field_move("F2", 95, y2-50, 45, 45);
-			field_move("F3", 140, y2-50, 45, 45);
-			field_move("F4", 185, y2-50, 45, 45);
-			field_move("F5", 130, y2-50, 45, 45);
-			field_move("F6", 175, y2-50, 45, 45);
-			field_move("F7", 220, y2-50, 45, 45);
-			field_move("F8", 265, y2-50, 45, 45);
-			field_move("F9", 310, y2-50, 45, 45);
-			field_move("F10", 355, y2-50, 45, 45);
-			field_move("WPM",410, y2-50, 50, 45);
-			field_move("PITCH", 460, y2-50, 50, 45);
-			field_move("CW_DELAY", 510, y2-50,75, 45);
-			field_move("CW_INPUT", 585, y2-50, 75 , 45);
-			field_move("SIDETONE", 660, y2-50, 75, 45);
+			field_move("ESC", 5, y2-47, 40, 45);
+			field_move("F1", 50, y2-47, 40, 45);
+			field_move("F2", 90, y2-47, 40, 45);
+			field_move("F3", 130, y2-47, 40, 45);
+			field_move("F4", 170, y2-47, 40, 45);
+			field_move("F5", 210, y2-47, 40, 45);
+			field_move("F6", 250, y2-47, 40, 45);
+			field_move("F7", 290, y2-47, 40, 45);
+			field_move("F8", 330, y2-47, 40, 45);
+			field_move("F9", 370, y2-47, 40, 45);
+			field_move("F10", 410, y2-47, 45, 45);
+			field_move("WPM",455, y2-47, 45, 45);
+			field_move("PITCH", 500, y2-47, 45, 45);
+			field_move("CW_DELAY", 545, y2-47,50, 45);
+			field_move("CW_INPUT", 595, y2-47, 70 , 45);
+			field_move("SIDETONE", 665, y2-47, 70, 45);
 			break;
 		case MODE_USB:
 		case MODE_LSB:
@@ -3377,7 +3372,7 @@ void rtc_write(int year, int month, int day, int hours, int minutes, int seconds
 	for (uint8_t i = 0; i < 7; i++){
   	int e = i2cbb_write_byte_data(DS3231_I2C_ADD, i, rtc_time[i]);
 		if (e)
-			printf("rtc_write: error writing ds1307 register at %d index\n", i);
+			printf("rtc_write: error writing DS3231 register at %d index\n", i);
 	}
 
 /*	int e =  i2cbb_write_i2c_block_data(DS1307_I2C_ADD, 0, 7, rtc_time);
@@ -3509,6 +3504,65 @@ void query_swr(){
 	set_field("#vswr", buff);
 }
 
+
+//if oled is detected, it will display the ip address on the oled
+// andwait for the tuning knob to be pressed to resume 
+
+void oled_setup(){
+	char ip_str[1000];
+
+	while(digitalRead(ENC1_SW) == HIGH){
+		ip_str[0] = 0;
+		FILE *pf = popen("hostname -I", "r");
+		if (pf){
+			fgets(ip_str, 100, pf);
+			pclose(pf);
+			//terminate the string at the first space
+			char *p = strchr(ip_str, ' ');
+			if (p)
+				*p = 0;
+			oled_clear();
+			oled_write(0,0, "Hi, zBitx is up on");
+			oled_write(0,1, ip_str);
+			oled_write(0,2, "Press Func to start");
+			oled_refresh();
+		}
+		delay(100);
+	}
+	
+	oled_clear();
+	oled_write(0, 3, "Starting...");
+}
+
+
+char oled_screen_text[100] = {0};
+void oled_update(){
+	char buff[100];
+
+	sprintf(buff, "%s %s", field_str("FREQ"), field_str("MODE"));
+	if (!strncmp(buff, oled_screen_text, sizeof(oled_screen_text)))
+		return;
+	strcpy(oled_screen_text, buff);
+	oled_clear();
+	oled_write(1,1, buff);
+	oled_refresh();		
+
+}
+
+void oled_toggle_band(){
+	unsigned int freq_now = field_int("FREQ");
+	//choose the next band 
+	int  band_now = 1;
+	for (int i = 0; i < sizeof(band_stack)/sizeof(struct band); i++){
+		if (band_stack[i].start <= freq_now && freq_now <= band_stack[i].stop)
+			band_now = i;	
+	}
+	if (band_now == (sizeof(band_stack)/sizeof(struct band)) -1)
+		change_band("80M");
+	else
+		change_band(band_stack[band_now+1].name); 
+}
+
 void hw_init(){
 	wiringPiSetup();
 	init_gpio_pins();
@@ -3520,6 +3574,10 @@ void hw_init(){
 
 	wiringPiISR(ENC2_A, INT_EDGE_BOTH, tuning_isr);
 	wiringPiISR(ENC2_B, INT_EDGE_BOTH, tuning_isr);
+	if (!oled_init()){
+		oled_available = 1;
+		oled_setup();
+	}
 }
 
 void hamlib_tx(int tx_input){
@@ -3770,13 +3828,19 @@ gboolean ui_tick(gpointer gook){
 		update_field(f);	//move this each time the spectrum watefall index is moved
 		f = get_field("waterfall");
 		update_field(f);
-
 		update_titlebar();
-/*		f = get_field("#status");
-		update_field(f);
-*/
-		if (digitalRead(ENC1_SW) == 0)
+
+		if (digitalRead(ENC1_SW) == 0){
+			//flip between mode and volume
+			if (f_focus && !strcmp(f_focus->label, "AUDIO"))
+				focus_field(get_field("r1:mode"));
+			else
 				focus_field(get_field("r1:volume"));
+			printf("Focus is on %s\n", f_focus->label);
+		}
+		
+		if (digitalRead(ENC2_SW) == 0)
+			oled_toggle_band();
 
 		if (record_start)
 			update_field(get_field("#record"));
@@ -3820,6 +3884,8 @@ gboolean ui_tick(gpointer gook){
       gdk_window_set_cursor(gdk_get_default_root_window(), new_cursor);
     }
 
+		if (oled_available)
+			oled_update();
 		ticks = 0;
   }
 	//update_field(get_field("#text_in")); //modem might have extracted some text
@@ -4494,6 +4560,7 @@ int main( int argc, char* argv[] ) {
 	setup();
 
 	rtc_sync();
+
 
 	struct field *f;
 	f = active_layout;
