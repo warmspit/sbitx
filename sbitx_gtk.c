@@ -1070,7 +1070,8 @@ void write_console(int style, char *text){
 		return;
 
 	write_to_remote_app(style, text);
-	oled_console(style, text);
+	if (oled_available)
+		oled_console(style, text);
 	while(*text){
 		char c = *text;
 		if (c == '\n')
@@ -1132,7 +1133,7 @@ int do_console(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 	int line_height = font_table[f->font_index].height; 	
 	int n_lines = (f->height / line_height) - 1;
 	int	l = 0;
-	int start_line;
+	int start_line = console_current_line - n_lines;
 
 	switch(event){
 		case FIELD_DRAW:
@@ -1141,7 +1142,6 @@ int do_console(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 		break;
 		case GDK_BUTTON_PRESS:
 		case GDK_MOTION_NOTIFY:
-			start_line = console_current_line - n_lines;
 			l = start_line + ((b - f->y)/line_height);
 			if (l < 0)
 				l += MAX_CONSOLE_LINES;
@@ -1157,6 +1157,12 @@ int do_console(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 			}
 			f->is_dirty = 1;
 			return 1;
+		break;
+		case FIELD_EDIT:
+			if (a == MIN_KEY_UP && console_selected_line > start_line)
+				console_selected_line--;
+			else if (a == MIN_KEY_DOWN && console_selected_line < start_line + n_lines - 1)
+				console_selected_line++;
 		break;
 	}
 	return 0;	
@@ -1799,7 +1805,7 @@ int waterfall_fn(struct field *f, cairo_t *gfx, int event, int a, int b){
 	}
 }
 
-char* freq_with_separators(char* freq_str){
+char* freq_with_separators(const char* freq_str){
 
   int freq = atoi(freq_str);
   int f_mhz, f_khz, f_hz;
@@ -3521,31 +3527,53 @@ void oled_setup(){
 			char *p = strchr(ip_str, ' ');
 			if (p)
 				*p = 0;
-			oled_clear();
-			oled_write(0,0, "Hi, zBitx is up on");
-			oled_write(0,1, ip_str);
-			oled_write(0,2, "Press Func to start");
-			oled_refresh();
+			oled_clear(OLED_A);
+			oled_write(OLED_A, 0,0, "Hi, zBitx is up on");
+			oled_write(OLED_A, 0,1, ip_str);
+			oled_write(OLED_A, 0, 2, "Press Func to start");
+			oled_refresh(OLED_A);
 		}
 		delay(100);
 	}
 	
-	oled_clear();
-	oled_write(0, 3, "Starting...");
+	oled_clear(OLED_A);
+	oled_write(OLED_A, 0, 3, "Starting...");
+	oled_refresh(OLED_A);
 }
 
 
-char oled_screen_text[100] = {0};
+char oled_screen_text[1000] = {0};
 void oled_update(){
-	char buff[100];
+	char buff[1000];
 
-	sprintf(buff, "%s %s", field_str("FREQ"), field_str("MODE"));
+	//draw out the radio display 
+	if (in_tx)
+		strcpy(buff, "T");
+	else if (!strcmp(field_str("SPLIT"), "ON"))
+		strcpy(buff, "S");
+	else if (!strcmp(field_str("VFO"), "A"))
+		strcpy(buff, "A");
+	else	
+		strcpy(buff, "B");
+	strcat(buff, ":");
+	strcat(buff, freq_with_separators(field_str("FREQ")));
+	strcat(buff, " ");
+	char const *p = field_str("AUDIO");
+	if (strlen(p) == 2);
+		strcat(buff, " ");
+	strcat(buff, p);
+	strcat(buff, " ");
+	p = field_str("MODE");
+	char *q = buff + strlen(buff);
+	strncpy(q, p, 5);
+	*(q + 5) = 0; 
+
 	if (!strncmp(buff, oled_screen_text, sizeof(oled_screen_text)))
 		return;
 	strcpy(oled_screen_text, buff);
-	oled_clear();
-	oled_write(1,1, buff);
-	oled_refresh();		
+	oled_clear(OLED_A);
+	oled_write(OLED_A, 0, 0, buff);
+	oled_refresh(OLED_A);		
 
 }
 
@@ -4624,12 +4652,12 @@ int main( int argc, char* argv[] ) {
   write_console(FONT_LOG, "\r\nEnter \\help for help\r\n");
 
 	if (strcmp(get_field("#mycallsign")->value, "NOBODY")){
-		sprintf(buff, "\nWelcome %s your grid is %s\n", 
+		sprintf(buff, "\nWelcome %s\nYour grid is %s\n", 
 		get_field("#mycallsign")->value, get_field("#mygrid")->value);
 		write_console(FONT_LOG, buff);
 	}
 	else 
-		write_console(FONT_LOG, "Set your with '\\callsign [yourcallsign]'\n"
+		write_console(FONT_LOG, "Set your callsign with '\\callsign [yourcallsign]'\n"
 		"Set your 6 letter grid with '\\grid [yourgrid]\n");
 
 	set_field("#text_in", "");
