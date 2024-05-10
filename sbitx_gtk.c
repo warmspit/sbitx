@@ -3545,6 +3545,8 @@ void oled_setup(){
 char oled_screen_text[1000] = {0};
 void oled_update(){
 	char buff[1000];
+	char const *mode;
+	char const *p;
 
 	//draw out the radio display 
 	if (in_tx)
@@ -3557,24 +3559,46 @@ void oled_update(){
 		strcpy(buff, "B");
 	strcat(buff, ":");
 	strcat(buff, freq_with_separators(field_str("FREQ")));
-	strcat(buff, " ");
-	char const *p = field_str("AUDIO");
-	if (strlen(p) == 2);
-		strcat(buff, " ");
-	strcat(buff, p);
-	strcat(buff, " ");
-	p = field_str("MODE");
+	
+	mode = field_str("MODE");
 	char *q = buff + strlen(buff);
 	strncpy(q, p, 5);
 	*(q + 5) = 0; 
+	strcat(buff, "\n>Audio:");
+	p = field_str("AUDIO");
+	strcat(buff, p);
+	strcat(buff, "\n Drive:");
+	strcat(buff, field_str("DRIVE"));
+	strcat(buff, "\n BW   :");
+	strcat(buff, field_str("BW"));
+	if (!strcmp(mode, "FT8")){
+		strcat(buff, "\n Pitch:");
+		strcat(buff, field_str("TX_PITCH"));
+	}
+	else if (!strcmp(mode, "LSB") || !strcmp(mode, "USB")){
+		strcat(buff, "\n Mic  :");
+		strcat(buff, field_str("MIC"));
+	}
+	else {
+		strcat(buff, "\n Pitch:");
+		strcat(buff, field_str("PITCH"));
+	}	
 
 	if (!strncmp(buff, oled_screen_text, sizeof(oled_screen_text)))
 		return;
 	strcpy(oled_screen_text, buff);
 	oled_clear(OLED_A);
-	oled_write(OLED_A, 0, 0, buff);
+	
+	p = buff;
+	for (int i = 0; i < 8; i++){
+		p = oled_write(OLED_A, 0, i, p);
+		if(*p == '\n')
+			p++;
+		else
+			break;
+	}
+	
 	oled_refresh(OLED_A);		
-
 }
 
 void oled_toggle_band(){
