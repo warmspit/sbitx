@@ -46,7 +46,7 @@ The initial sync between the gui values, the core radio values, settings, et al 
 #define FT8_START_QSO 1
 #define FT8_CONTINUE_QSO 0
 void ft8_process(char *received, int operation);
-
+void change_band (char *request);
 /* command  buffer for commands received from the remote */
 struct Queue q_remote_commands;
 struct Queue q_tx_text;
@@ -497,7 +497,7 @@ struct field main_controls[] = {
 		"", 0, 100, 1,COMMON_CONTROL},
 
 	{"#step", NULL, 560, 5 ,40, 40, "STEP", 1, "10Hz", FIELD_SELECTION, FONT_FIELD_VALUE, 
-		"10K/1K/100H/10H", 0,0,0,COMMON_CONTROL},
+		"10K/1K/500H/100H/10H", 0,0,0,COMMON_CONTROL},
 	{"#span", NULL, 560, 50 , 40, 40, "SPAN", 1, "A", FIELD_SELECTION, FONT_FIELD_VALUE, 
 		"25K/10K/6K/2.5K", 0,0,0,COMMON_CONTROL},
 
@@ -512,7 +512,7 @@ struct field main_controls[] = {
 		"", 50, 5000, 50,COMMON_CONTROL},
 
 	{ "r1:mode", NULL, 5, 5, 40, 40, "MODE", 40, "USB", FIELD_SELECTION, FONT_FIELD_VALUE, 
-		"USB/LSB/CW/CWR/FT8/PSK31/RTTY/DIGITAL/2TONE", 0,0,0, COMMON_CONTROL},
+		"USB/LSB/CW/CWR/FT8/AM/DIGITAL/2TONE", 0,0,0, COMMON_CONTROL},
 
 	/* logger controls */
 
@@ -556,13 +556,13 @@ struct field main_controls[] = {
 		"RX/TX", 0,0, 0, VOICE_CONTROL},
 
 	{ "#rx", NULL, 650, -400, 50, 50, "RX", 40, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
-		"RX/TX", 0,0, 0, VOICE_CONTROL},
+		"RX/TX", 0,0, 0, VOICE_CONTROL | DIGITAL_CONTROL},
 	
 
-	{"r1:low", NULL, 400, -400, 50, 50, "LOW", 40, "300", FIELD_NUMBER, FONT_FIELD_VALUE, 
-		"", 0,4000, 50, 0},
-	{"r1:high", NULL, 450, -400, 50, 50, "HIGH", 40, "3000", FIELD_NUMBER, FONT_FIELD_VALUE, 
-		"", 300, 10000, 50, 0},
+	{"r1:low", NULL, 660, -350, 50, 50, "LOW", 40, "300", FIELD_NUMBER, FONT_FIELD_VALUE, 
+		"", 100,4000, 50, 0, DIGITAL_CONTROL},
+	{"r1:high", NULL, 580, -350, 50, 50, "HIGH", 40, "3000", FIELD_NUMBER, FONT_FIELD_VALUE, 
+		"", 100, 10000, 50, 0, DIGITAL_CONTROL},
 
 	{"spectrum", do_spectrum, 400, 101, 400, 100, "SPECTRUM", 70, "7000 KHz", FIELD_STATIC, FONT_SMALL, 
 		"", 0,0,0, COMMON_CONTROL},  
@@ -2035,26 +2035,29 @@ static void layout_ui(){
 		break;
 		case MODE_CW:
 		case MODE_CWR:
-			field_move("CONSOLE", 5, y1, 350, y2-y1-55);
-			field_move("SPECTRUM", 360, y1, x2-365, 60);
-			field_move("WATERFALL", 360, y1+60, x2-365, y2-y1-115);
+			field_move("CONSOLE", 5, y1, 350, y2-y1-110);
+			field_move("SPECTRUM", 360, y1, x2-365, 70);
+			field_move("WATERFALL", 360, y1+60, x2-365, y2-y1-110);
 			// first line below the decoder/waterfall
-			field_move("ESC", 5, y2-50, 40, 45);
-			field_move("F1", 50, y2-50, 45, 45);
-			field_move("F2", 95, y2-50, 45, 45);
-			field_move("F3", 140, y2-50, 45, 45);
-			field_move("F4", 185, y2-50, 45, 45);
-			field_move("F5", 130, y2-50, 45, 45);
-			field_move("F6", 175, y2-50, 45, 45);
-			field_move("F7", 220, y2-50, 45, 45);
-			field_move("F8", 265, y2-50, 45, 45);
-			field_move("F9", 310, y2-50, 45, 45);
-			field_move("F10", 355, y2-50, 45, 45);
-			field_move("WPM",410, y2-50, 50, 45);
-			field_move("PITCH", 460, y2-50, 50, 45);
-			field_move("CW_DELAY", 510, y2-50,75, 45);
-			field_move("CW_INPUT", 585, y2-50, 75 , 45);
-			field_move("SIDETONE", 660, y2-50, 75, 45);
+			y1 = y2 - 97;
+			field_move("ESC", 5, y1, 70, 45);
+			field_move("WPM",75, y1, 75, 45);
+			field_move("PITCH", 150, y1, 75, 45);
+			field_move("CW_DELAY", 225, y1, 75, 45);
+			field_move("CW_INPUT", 375, y1, 75 , 45);
+			field_move("SIDETONE", 450, y1, 75, 45);
+
+			y1 += 50;
+			field_move("F1", 5, y1, 70, 45);
+			field_move("F2", 75, y1, 75, 45);
+			field_move("F3", 150, y1, 75, 45);
+			field_move("F4", 225, y1, 75, 45);
+			field_move("F5", 300, y1, 75, 45);
+			field_move("F6", 375, y1, 75, 45);
+			field_move("F7", 450, y1, 75, 45);
+			field_move("F8", 525, y1, 75, 45);
+			field_move("F9", 600, y1, 75, 45);
+			field_move("F10", 675, y1, 70, 45);
 			break;
 		case MODE_USB:
 		case MODE_LSB:
@@ -2065,6 +2068,8 @@ static void layout_ui(){
 			field_move("WATERFALL", 360, y1+70, x2-365, y2-y1-125);
 			y1 = y2 -50;
 			field_move("MIC", 5, y1, 45, 45);
+			field_move("LOW", 60, y1, 95, 45);
+			field_move("HIGH", 160, y1, 95, 45);
 			field_move("TX", 260, y1, 95, 45);
 			field_move("RX", 360, y1, 95, 45);
 		break;
@@ -2086,6 +2091,8 @@ static void layout_ui(){
 			field_move("F10", 100, y1, 100, 45);
 			field_move("F11",200, y1, 100, 45);
 			field_move("F12",300, y1, 95, 45);
+			field_move("LOW", 400, y1, 50, 45);
+			field_move("HIGH", 475, y1, 50, 45);
 			field_move("PITCH", 550, y1, 50, 45);
 			field_move("SIDETONE", 600, y1, 95, 45);
 		break;	
@@ -2299,8 +2306,6 @@ static void focus_field(struct field *f){
 
 time_t time_sbitx(){
 	if (time_delta)
-		return  (millis()/1000l) + time_delta;
-	else
 		return time(NULL);
 }
 
@@ -2487,6 +2492,10 @@ void set_filter_high_low(int hz){
 		case MODE_DIGITAL:
 			low = atoi(f_pitch->value) - (hz/2);
 			high = atoi(f_pitch->value) + (hz/2);
+			break;
+		case MODE_AM:
+			low = 300;
+			high = hz;
 			break;
 		case MODE_FT8:
 			low = 50;
@@ -3508,6 +3517,21 @@ void query_swr(){
 	sprintf(buff, "%d", vswr);
 	set_field("#vswr", buff);
 }
+void oled_toggle_band(){
+	unsigned int freq_now = field_int("FREQ");
+	//choose the next band 
+	int  band_now = 1;
+	for (int i = 0; i < sizeof(band_stack)/sizeof(struct band); i++){
+		if (band_stack[i].start <= freq_now && freq_now <= band_stack[i].stop)
+			band_now = i;	
+	}
+	if (band_now == (sizeof(band_stack)/sizeof(struct band)) -1)
+		change_band("80M");
+	else
+		change_band(band_stack[band_now+1].name); 
+}
+
+
 
 void hw_init(){
 	wiringPiSetup();
@@ -3659,6 +3683,7 @@ void set_radio_mode(char *mode){
 			break;
 		case MODE_LSB:
 		case MODE_USB:
+		case MODE_AM:
 			new_bandwidth = field_int("BW_VOICE");
 			break;
 		case MODE_FT8:
@@ -3775,8 +3800,17 @@ gboolean ui_tick(gpointer gook){
 /*		f = get_field("#status");
 		update_field(f);
 */
-		if (digitalRead(ENC1_SW) == 0)
+
+		if (digitalRead(ENC1_SW) == 0){
+			//flip between mode and volume
+			if (f_focus && !strcmp(f_focus->label, "AUDIO"))
+				focus_field(get_field("r1:mode"));
+			else
 				focus_field(get_field("r1:volume"));
+			printf("Focus is on %s\n", f_focus->label);
+		}
+		if (digitalRead(ENC2_SW) == 0)
+		oled_toggle_band();
 
 		if (record_start)
 			update_field(get_field("#record"));
@@ -3831,8 +3865,8 @@ gboolean ui_tick(gpointer gook){
  
 	f = get_field("r1:mode");
 	//straight key in CW
-	if (f && (!strcmp(f->value, "2TONE") || !strcmp(f->value, "LSB") || 
-	!strcmp(f->value, "USB"))){
+	if (f && (!strcmp(f->value, "2TONE") || !strcmp(f->value, "LSB") 
+	|| !strcmp(f->value, "AM") || !strcmp(f->value, "USB"))){
 		if (digitalRead(PTT) == LOW && in_tx == 0)
 			tx_on(TX_PTT);
 		else if (digitalRead(PTT) == HIGH && in_tx  == TX_PTT)
@@ -4169,6 +4203,8 @@ void do_control_action(char *cmd){
 		tuning_step = 10000;
 	else if (!strcmp(request, "STEP 1K"))
 		tuning_step = 1000;
+	else if (!strcmp(request, "STEP 500H"))
+		tuning_step = 500;
 	else if (!strcmp(request, "STEP 100H"))
 		tuning_step = 100;
 	else if (!strcmp(request, "STEP 10H"))
@@ -4397,6 +4433,11 @@ void cmd_exec(char *cmd){
 		tx_on(TX_SOFT);
 	else if (!strcmp(exec, "r"))
 		tx_off();
+// added rtx for web remote tx function coming soon
+        else if (!strcmp(exec, "rtx")) {
+                tx_on(TX_SOFT);
+                sound_input(1);
+            }
 	else if (!strcmp(exec, "telnet")){
 		if (strlen(args) > 5) 
 			telnet_open(args);
