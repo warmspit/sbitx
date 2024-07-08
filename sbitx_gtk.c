@@ -343,8 +343,6 @@ struct band {
 	char name[10];
 	int	start;
 	int	stop;
-	//int	power;
-	//int	max;
 	int index;
 	int	freq[STACK_DEPTH];
 	int mode[STACK_DEPTH];
@@ -465,21 +463,21 @@ int current_layout = LAYOUT_KBD;
 // the cmd fields that have '#' are not to be sent to the sdr
 struct field main_controls[] = {
 	/* band stack registers */
-	{"#10m", NULL, 50, 5, 40, 40, "10M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
+	{"#10m", NULL, 50, 5, 40, 40, "10M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
-	{"#12m", NULL, 90, 5, 40, 40, "12M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
+	{"#12m", NULL, 90, 5, 40, 40, "12M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
-	{"#15m", NULL, 130, 5, 40, 40, "15M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
+	{"#15m", NULL, 130, 5, 40, 40, "15M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0i,COMMON_CONTROL},
-	{"#17m", NULL, 170, 5, 40, 40, "17M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
+	{"#17m", NULL, 170, 5, 40, 40, "17M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
-	{"#20m", NULL, 210, 5, 40, 40, "20M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
+	{"#20m", NULL, 210, 5, 40, 40, "20M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
-	{"#30m", NULL, 250, 5, 40, 40, "30M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
+	{"#30m", NULL, 250, 5, 40, 40, "30M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
-	{"#40m", NULL, 290, 5, 40, 40, "40M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
+	{"#40m", NULL, 290, 5, 40, 40, "40M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
-	{"#80m", NULL, 330, 5, 40, 40, "80M", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
+	{"#80m", NULL, 330, 5, 40, 40, "80M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
 	{ "#record", do_record, 380, 5, 40, 40, "REC", 40, "OFF", FIELD_TOGGLE, FONT_FIELD_VALUE, 
 		"ON/OFF", 0,0, 0,COMMON_CONTROL},
@@ -4120,9 +4118,9 @@ void change_band(char *request){
 	field_set("MODE", mode_name[band_stack[new_band].mode[stack]]);	
 	update_field(get_field("r1:mode"));
 
+	struct field *bandswitch = get_field_by_label(band_stack[new_band].name);
+	sprintf(bandswitch->value, "%d", band_stack[new_band].index+1);
   // this fixes bug with filter settings not being applied after a band change, not sure why it's a bug - k3ng 2022-09-03
-//  set_field("r1:low",get_field("r1:low")->value);
-//  set_field("r1:high",get_field("r1:high")->value);
 
 	abort_tx();
 }

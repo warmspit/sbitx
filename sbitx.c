@@ -1004,7 +1004,6 @@ void sound_process(
 void set_rx_filter(){
 	//on AM filter at the IF level, instead of the baseband
 	if (rx_list->mode == MODE_AM){
-		printf("Setting AM filter\n");
    		filter_tune(rx_list->filter, 
       		(1.0 * (24000 - rx_list->high_hz))/96000.0 , 
       		(1.0 * (24000 + rx_list->high_hz))/96000.0 , 
@@ -1446,7 +1445,6 @@ void sdr_request(char *request, char *response){
 		// Effectively, if a signal moves up, so does the second IF
 
 		if (rx_list->mode == MODE_AM){
-			puts("\n\n\ntx am filter ");
 			filter_tune(tx_list->filter, 
 				(1.0 * 20000)/96000.0, 
 				(1.0 * 30000)/96000.0 , 
@@ -1457,7 +1455,6 @@ void sdr_request(char *request, char *response){
 				5);
 		}
 		else if (rx_list->mode == MODE_LSB || rx_list->mode == MODE_CWR){
-			puts("\n\n\ntx LSB filter ");
 			filter_tune(tx_list->filter, 
 				(1.0 * -3000)/96000.0, 
 				(1.0 * -300)/96000.0 , 
@@ -1468,7 +1465,6 @@ void sdr_request(char *request, char *response){
 				5);
 		}
 		else { 
-			puts("\n\n\ntx USB filter ");
 			filter_tune(tx_list->filter, 
 				(1.0 * 300)/96000.0, 
 				(1.0 * 3000)/96000.0 , 
@@ -1491,7 +1487,6 @@ void sdr_request(char *request, char *response){
 		strcpy(response, "ok");
 	}
 	else if (!strcmp(cmd, "txmode")){
-		puts("\n\n\n\n###### tx filter #######");
 		if (!strcmp(value, "LSB") || !strcmp(value, "CWR"))
 			filter_tune(tx_filter, (1.0*-3000)/96000.0, (1.0 * -300)/96000.0, 5);
 		else
