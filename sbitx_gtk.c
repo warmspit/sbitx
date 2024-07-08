@@ -386,7 +386,9 @@ static int tx_mode = MODE_USB;
 
 struct band band_stack[] = {
 	{"80M", 3500000, 4000000, 0, 
-		{3500000,3574000,3600000,3700000},{MODE_CW, MODE_USB, MODE_CW,MODE_LSB}},
+		{3500000,3574000,3600000,3700000},{MODE_CW, MODE_LSB, MODE_CW,MODE_LSB}},
+	{"60M", 5250000, 5500000, 0, 
+		{5251500, 5354000,5357000,5360000},{MODE_CW, MODE_USB, MODE_USB, MODE_USB}},
 	{"40M", 7000000,7300000, 0,
 		{7000000,7040000,7074000,7150000},{MODE_CW, MODE_CW, MODE_USB, MODE_LSB}},
 	{"30M", 10100000, 10150000, 0,
@@ -472,12 +474,12 @@ struct field main_controls[] = {
 		"", 0,0,0,COMMON_CONTROL},
 	{"#40m", NULL, 290, 5, 40, 40, "40M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
-	{"#80m", NULL, 330, 5, 40, 40, "80M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
+	{"#60m", NULL, 330, 5, 40, 40, "60M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
 		"", 0,0,0,COMMON_CONTROL},
-	{ "#record", do_record, 380, 5, 40, 40, "REC", 40, "OFF", FIELD_TOGGLE, FONT_FIELD_VALUE, 
+	{"#80m", NULL, 370, 5, 40, 40, "80M", 1, "1", FIELD_BUTTON, FONT_FIELD_VALUE, 
+		"", 0,0,0,COMMON_CONTROL},
+	{ "#record", do_record, 420, 5, 40, 40, "REC", 40, "OFF", FIELD_TOGGLE, FONT_FIELD_VALUE, 
 		"ON/OFF", 0,0, 0,COMMON_CONTROL},
-	{ "#web", NULL, 420,5,  40, 40, "WEB", 40, "", FIELD_BUTTON, FONT_FIELD_VALUE, 
-		"", 0,0, 0,COMMON_CONTROL},
 	{"#set", NULL, 460, 5, 40, 40, "SET", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE,"", 0,0,0,COMMON_CONTROL}, 
 	{ "r1:gain", NULL, 375, 5, 40, 40, "IF", 40, "60", FIELD_NUMBER, FONT_FIELD_VALUE, 
 		"", 0, 100, 1,COMMON_CONTROL},
@@ -1433,6 +1435,10 @@ static int user_settings_handler(void* user, const char* section,
 		else if (!strcmp(section, "10M"))
 			band = 7;	
 
+		//get the freq out first
+		int freq = atoi(value);
+		if (freq < band_stack[band].start || band_stack[band].stop < freq)
+			return 1;
 		if (band >= 0  && !strcmp(name, "freq0"))
 			band_stack[band].freq[0] = atoi(value);
 		else if (band >= 0  && !strcmp(name, "freq1"))
@@ -4327,6 +4333,7 @@ void do_control_action(char *cmd){
 		
 	//handle the band stacking
 	else if (!strcmp(request, "80M") || 
+		!strcmp(request, "60M") ||
 		!strcmp(request, "40M") || 
 		!strcmp(request, "30M") || 
 		!strcmp(request, "20M") || 
