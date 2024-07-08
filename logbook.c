@@ -183,38 +183,6 @@ void logbook_add(char *contact_callsign, char *rst_sent, char *exchange_sent,
 		logbook_fill(0,10000,NULL);
 	}	
 }
-/*
-void import_logs(char *filename){
-	char entry_text[1000], statement[1000];
-	char freq[10], mode[10], date_str[10], time_str[10], mycall[10], rst_sent[10],
-	exchange_sent[10], contact_callsign[10], rst_recv[10], exchange_recv[10];
-
-	FILE *pf = fopen(filename, "r");
-	while(fgets(entry_text, sizeof(entry_text), pf)){
-		char *p = strtok(entry_text, "\t ");
-		strcpy(freq, p);
-		strcpy(mode, strtok(NULL, "\t "));
-		strcpy(date_str, strtok(NULL, "\t "));
-		strcpy(time_str, strtok(NULL, "\t "));
-		strcpy(mycall, strtok(NULL, "\t "));
-		strcpy(rst_sent, strtok(NULL, "\t "));
-		strcpy(exchange_sent, strtok(NULL, "\t "));
-		strcpy(contact_callsign, strtok(NULL, "\t "));
-		strcpy(rst_recv, strtok(NULL, "\t "));
-		strcpy(exchange_recv, strtok(NULL, "\t\n"));
-		sprintf(statement,
-		"INSERT INTO logbook (freq, mode, qso_date, qso_time, callsign_sent,"
-		"rst_sent, exch_sent, callsign_recv, rst_recv, exch_recv) "
-		"VALUES('%s', '%s', '%s', '%s',  '%s','%s','%s',  '%s','%s','%s');",
-			freq, mode, date_str, time_str,
-			 mycall, rst_sent, exchange_sent,
-			contact_callsign, rst_recv, exchange_recv);
-			
-		puts(statement);
-	}
-	fclose(pf);
-}
-*/
 
 // ADIF field headers, see note above
 const static char *adif_names[]={"ID","MODE","FREQ","QSO_DATE","TIME_ON","OPERATOR","RST_SENT","STX_String","CALL","RST_RCVD","SRX_String","STX","COMMENTS"};
@@ -347,7 +315,7 @@ int get_filename(char *path) {
 		return -1;
 }
 
-void import_button_clicked(GtkWidget *window) {
+void export_button_clicked(GtkWidget *window) {
     GtkWidget *dialog, *content_area, *vbox, *hbox, *frombox, *tobox;
     GtkWidget *start_label, *end_label;
     GtkWidget *start_calendar, *end_calendar;
@@ -880,11 +848,11 @@ void logbook_list_open(){
     gtk_container_add(GTK_CONTAINER(delete_tool_item), delete_button);
     gtk_toolbar_insert(GTK_TOOLBAR(toolbar), delete_tool_item, -1);
 
-    // Create "Import" button
-    GtkWidget *import_button = gtk_button_new_with_label("Import...");
-    GtkToolItem *import_tool_item = gtk_tool_item_new();
-    gtk_container_add(GTK_CONTAINER(import_tool_item), import_button);
-    gtk_toolbar_insert(GTK_TOOLBAR(toolbar), import_tool_item, -1);
+    // Create "Export" button
+    GtkWidget *export_button = gtk_button_new_with_label("Export...");
+    GtkToolItem *export_tool_item = gtk_tool_item_new();
+    gtk_container_add(GTK_CONTAINER(export_tool_item), export_button);
+    gtk_toolbar_insert(GTK_TOOLBAR(toolbar), export_tool_item, -1);
 
     // Create a scrolled window
     scrolled_window = gtk_scrolled_window_new(NULL, NULL);
@@ -913,7 +881,7 @@ void logbook_list_open(){
 		//connect the edit button the handler, passing the tree_view (afte tree_view is created) 
     g_signal_connect(edit_button, "clicked", G_CALLBACK(edit_button_clicked), tree_view);
     g_signal_connect(delete_button, "clicked", G_CALLBACK(delete_button_clicked), tree_view);
-    g_signal_connect(import_button, "clicked", G_CALLBACK(import_button_clicked), window);
+    g_signal_connect(export_button, "clicked", G_CALLBACK(export_button_clicked), window);
     g_signal_connect(search_entry, "changed", G_CALLBACK(search_update), tree_view); // Connect signal handler
 /*
     // Apply CSS for tree view
