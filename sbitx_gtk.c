@@ -3515,6 +3515,7 @@ void query_swr(){
 	sprintf(buff, "%d", vswr);
 	set_field("#vswr", buff);
 }
+
 void oled_toggle_band(){
 	unsigned int freq_now = field_int("FREQ");
 	//choose the next band 
@@ -3528,9 +3529,6 @@ void oled_toggle_band(){
 	else
 		change_band(band_stack[band_now+1].name); 
 }
-
-
-
 
 //if oled is detected, it will display the ip address on the oled
 // andwait for the tuning knob to be pressed to resume 
@@ -3548,18 +3546,18 @@ void oled_setup(){
 			char *p = strchr(ip_str, ' ');
 			if (p)
 				*p = 0;
-			oled_clear(OLED_A);
-			oled_write(OLED_A, 0,0, "Hi, zBitx is up on");
-			oled_write(OLED_A, 0,1, ip_str);
-			oled_write(OLED_A, 0, 2, "Press Func to start");
-			oled_refresh(OLED_A);
+			oled_clear();
+			oled_write(0,0, "Hi, zBitx is up on");
+			oled_write(0,1, ip_str);
+			oled_write(0, 2, "Press Func to start");
+			oled_refresh();
 		}
 		delay(100);
 	}
 	
-	oled_clear(OLED_A);
-	oled_write(OLED_A, 0, 3, "Starting...");
-	oled_refresh(OLED_A);
+	oled_clear();
+	oled_write(0, 3, "Starting...");
+	oled_refresh();
 }
 
 
@@ -3608,32 +3606,18 @@ void oled_update(){
 	if (!strncmp(buff, oled_screen_text, sizeof(oled_screen_text)))
 		return;
 	strcpy(oled_screen_text, buff);
-	oled_clear(OLED_A);
+	oled_clear();
 	
 	p = buff;
 	for (int i = 0; i < 8; i++){
-		p = oled_write(OLED_A, 0, i, p);
+		p = oled_write(0, i, p);
 		if(*p == '\n')
 			p++;
 		else
 			break;
 	}
 	
-	oled_refresh(OLED_A);		
-}
-
-void oled_toggle_band(){
-	unsigned int freq_now = field_int("FREQ");
-	//choose the next band 
-	int  band_now = 1;
-	for (int i = 0; i < sizeof(band_stack)/sizeof(struct band); i++){
-		if (band_stack[i].start <= freq_now && freq_now <= band_stack[i].stop)
-			band_now = i;	
-	}
-	if (band_now == (sizeof(band_stack)/sizeof(struct band)) -1)
-		change_band("80M");
-	else
-		change_band(band_stack[band_now+1].name); 
+	oled_refresh();		
 }
 
 void hw_init(){

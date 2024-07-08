@@ -41,6 +41,6 @@ gcc -g -o $F \
 	`pkg-config --cflags gtk+-3.0` `pkg-config --libs gtk+-3.0`
 
 
-gcc -g -o start oled.c sbitx_start.c i2cbb.c -lwiringPi
+#gcc -g -o start oled.c sbitx_start.c i2cbb.c -lwiringPi
 
 echo "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"

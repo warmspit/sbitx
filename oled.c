@@ -148,16 +148,17 @@ int oled_init(){
 	return 0;
 }
 
-void oled_write(uint8_t col, uint8_t row, char *string){
+const char *oled_write(uint8_t col, uint8_t row, const char *string){
 	int offset = (128 * row) + col + 2;
 	uint8_t *b = oled_bmp + offset;
 
-	while(*string){
+	while(*string >= ' '){
 		const uint8_t *f = font + ((*string-32) * 6);
 		for (int j = 0; j < 6; j++)
 			*b++ = *f++;	
 		string++;
 	}
+	return string;
 }
 
 #define MAX_LINES 100
