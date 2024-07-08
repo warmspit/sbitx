@@ -960,8 +960,6 @@ void tx_process(
 		r->fft_freq[b] = fft_out[i];
 	}
 
-	// the spectrum display is updated
-	//spectrum_update();
 
 	//convert back to time domain	
 	fftw_execute(r->plan_rev);
@@ -977,7 +975,6 @@ void tx_process(
 			max = output_tx[i];	
 			//output_tx[i] = 0;
 	}
-//	printf("min %d, max %d\n", min, max);
 
 	read_power();
 	sdr_modulation_update(output_tx, MAX_BINS/2, tx_amp);	

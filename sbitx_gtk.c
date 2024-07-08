@@ -369,11 +369,6 @@ static int *tx_mod_buff = NULL;
 static int tx_mod_index = 0;
 static int tx_mod_max = 0;
 
-char*mode_name[MAX_MODES] = {
-	"USB", "LSB", "CW", "CWR", "NBFM", "AM", "FT8", "PSK31", "RTTY", 
-	"DIGITAL", "2TONE" 
-};
-
 static int serial_fd = -1;
 static int xit = 512; 
 static long int tuning_step = 1000;
@@ -1276,10 +1271,6 @@ static int mode_id(const char *mode_str){
 		return MODE_LSB;
 	else if (!strcmp(mode_str,  "FT8"))
 		return MODE_FT8;
-	else if (!strcmp(mode_str,  "PSK31"))
-		return MODE_PSK31;
-	else if (!strcmp(mode_str,  "RTTY"))
-		return MODE_RTTY;
 	else if (!strcmp(mode_str, "NBFM"))
 		return MODE_NBFM;
 	else if (!strcmp(mode_str, "AM"))
@@ -1291,6 +1282,35 @@ static int mode_id(const char *mode_str){
 	return -1;
 }
 
+static char *mode_name(int mode_id, char *name){
+	
+	switch(mode_id){
+		case MODE_USB:
+			return strcpy(name, "USB");
+		case MODE_LSB:
+			return strcpy(name, "LSB");
+		case MODE_CW:
+			return strcpy(name, "CW");
+		case MODE_CWR:
+			return strcpy(name, "CWR");
+		case MODE_NBFM:
+			return strcpy(name, "NBFM");
+		case MODE_AM:
+			return strcpy(name, "AM");
+		case MODE_FT8:
+			return strcpy(name, "FT8");
+		case MODE_DIGITAL:
+			return strcpy(name, "DIGITAL");
+		case MODE_2TONE:
+			return strcpy(name, "2TONE");
+		case MODE_TUNE:
+			return strcpy(name, "TUNE");
+		case MODE_CALIBRATE:
+			return strcpy(name, "CALIBRATE");
+		default:
+			return strcpy(name, "USB");
+	}
+}
 
 static void save_user_settings(int forced){
 	static int last_save_at = 0;
@@ -2862,12 +2882,6 @@ int do_macro(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 	
 		mode = get_field("r1:mode")->value;
 
-		//add the end of transmission to the expanded buffer for the fldigi modes
-		if (!strcmp(mode, "RTTY") || !strcmp(mode, "PSK31")){
-			strcat(buff, "^r");
-			tx_on(TX_SOFT);
-		}
-
 		if (!strcmp(mode, "FT8") && strlen(buff)){
 			ft8_tx(buff, atoi(get_field("#tx_pitch")->value));
 			set_field("#text_in", "");
@@ -4061,6 +4075,7 @@ int is_in_tx(){
 	return in_tx;
 }
 
+
 /* handle the ui request and update the controls */
 
 void change_band(char *request){
@@ -4115,7 +4130,9 @@ void change_band(char *request){
 	char resp[100];
 	set_operating_freq(band_stack[new_band].freq[stack], resp);
 	field_set("FREQ", buff);
-	field_set("MODE", mode_name[band_stack[new_band].mode[stack]]);	
+
+	mode_name(band_stack[new_band].mode[stack], resp);
+	field_set("MODE", resp);	
 	update_field(get_field("r1:mode"));
 
 	struct field *bandswitch = get_field_by_label(band_stack[new_band].name);
