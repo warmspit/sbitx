@@ -42,11 +42,13 @@ The initial sync between the gui values, the core radio values, settings, et al 
 #include "i2cbb.h"
 #include "webserver.h"
 #include "logbook.h"
+#include "oled.h"
 
 #define FT8_START_QSO 1
 #define FT8_CONTINUE_QSO 0
 void ft8_process(char *received, int operation);
-void change_band (char *request);
+void change_band(char *request);
+
 /* command  buffer for commands received from the remote */
 struct Queue q_remote_commands;
 struct Queue q_tx_text;
@@ -196,6 +198,8 @@ int console_current_line = 0;
 int	console_selected_line = -1;
 struct Queue q_web;
 
+//oled stuf
+static uint8_t oled_available = 0;
 
 // event ids, some of them are mapped from gtk itself
 #define FIELD_DRAW 0
@@ -1065,17 +1069,9 @@ void write_console(int style, char *text){
 	if (strlen(text) == 0)
 		return;
 
-/*
-	//write to the scroll
-	FILE *pf = fopen(directory, "a");
-	if (pf){
-		fwrite(text, strlen(text), 1, pf);
-		fclose(pf);
-		pf = NULL;
-	}
-*/	
 	write_to_remote_app(style, text);
-
+	if (oled_available)
+		oled_console(style, text);
 	while(*text){
 		char c = *text;
 		if (c == '\n')
@@ -1137,7 +1133,7 @@ int do_console(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 	int line_height = font_table[f->font_index].height; 	
 	int n_lines = (f->height / line_height) - 1;
 	int	l = 0;
-	int start_line;
+	int start_line = console_current_line - n_lines;
 
 	switch(event){
 		case FIELD_DRAW:
@@ -1146,7 +1142,6 @@ int do_console(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 		break;
 		case GDK_BUTTON_PRESS:
 		case GDK_MOTION_NOTIFY:
-			start_line = console_current_line - n_lines;
 			l = start_line + ((b - f->y)/line_height);
 			if (l < 0)
 				l += MAX_CONSOLE_LINES;
@@ -1162,6 +1157,12 @@ int do_console(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 			}
 			f->is_dirty = 1;
 			return 1;
+		break;
+		case FIELD_EDIT:
+			if (a == MIN_KEY_UP && console_selected_line > start_line)
+				console_selected_line--;
+			else if (a == MIN_KEY_DOWN && console_selected_line < start_line + n_lines - 1)
+				console_selected_line++;
 		break;
 	}
 	return 0;	
@@ -1804,7 +1805,7 @@ int waterfall_fn(struct field *f, cairo_t *gfx, int event, int a, int b){
 	}
 }
 
-char* freq_with_separators(char* freq_str){
+char* freq_with_separators(const char* freq_str){
 
   int freq = atoi(freq_str);
   int f_mhz, f_khz, f_hz;
@@ -2039,25 +2040,22 @@ static void layout_ui(){
 			field_move("SPECTRUM", 360, y1, x2-365, 70);
 			field_move("WATERFALL", 360, y1+60, x2-365, y2-y1-110);
 			// first line below the decoder/waterfall
-			y1 = y2 - 97;
-			field_move("ESC", 5, y1, 70, 45);
-			field_move("WPM",75, y1, 75, 45);
-			field_move("PITCH", 150, y1, 75, 45);
-			field_move("CW_DELAY", 225, y1, 75, 45);
-			field_move("CW_INPUT", 375, y1, 75 , 45);
-			field_move("SIDETONE", 450, y1, 75, 45);
-
-			y1 += 50;
-			field_move("F1", 5, y1, 70, 45);
-			field_move("F2", 75, y1, 75, 45);
-			field_move("F3", 150, y1, 75, 45);
-			field_move("F4", 225, y1, 75, 45);
-			field_move("F5", 300, y1, 75, 45);
-			field_move("F6", 375, y1, 75, 45);
-			field_move("F7", 450, y1, 75, 45);
-			field_move("F8", 525, y1, 75, 45);
-			field_move("F9", 600, y1, 75, 45);
-			field_move("F10", 675, y1, 70, 45);
+			field_move("ESC", 5, y2-47, 40, 45);
+			field_move("F1", 50, y2-47, 40, 45);
+			field_move("F2", 90, y2-47, 40, 45);
+			field_move("F3", 130, y2-47, 40, 45);
+			field_move("F4", 170, y2-47, 40, 45);
+			field_move("F5", 210, y2-47, 40, 45);
+			field_move("F6", 250, y2-47, 40, 45);
+			field_move("F7", 290, y2-47, 40, 45);
+			field_move("F8", 330, y2-47, 40, 45);
+			field_move("F9", 370, y2-47, 40, 45);
+			field_move("F10", 410, y2-47, 45, 45);
+			field_move("WPM",455, y2-47, 45, 45);
+			field_move("PITCH", 500, y2-47, 45, 45);
+			field_move("CW_DELAY", 545, y2-47,50, 45);
+			field_move("CW_INPUT", 595, y2-47, 70 , 45);
+			field_move("SIDETONE", 665, y2-47, 70, 45);
 			break;
 		case MODE_USB:
 		case MODE_LSB:
@@ -3386,7 +3384,7 @@ void rtc_write(int year, int month, int day, int hours, int minutes, int seconds
 	for (uint8_t i = 0; i < 7; i++){
   	int e = i2cbb_write_byte_data(DS3231_I2C_ADD, i, rtc_time[i]);
 		if (e)
-			printf("rtc_write: error writing ds1307 register at %d index\n", i);
+			printf("rtc_write: error writing DS3231 register at %d index\n", i);
 	}
 
 /*	int e =  i2cbb_write_i2c_block_data(DS1307_I2C_ADD, 0, 7, rtc_time);
@@ -3533,6 +3531,111 @@ void oled_toggle_band(){
 
 
 
+
+//if oled is detected, it will display the ip address on the oled
+// andwait for the tuning knob to be pressed to resume 
+
+void oled_setup(){
+	char ip_str[1000];
+
+	while(digitalRead(ENC1_SW) == HIGH){
+		ip_str[0] = 0;
+		FILE *pf = popen("hostname -I", "r");
+		if (pf){
+			fgets(ip_str, 100, pf);
+			pclose(pf);
+			//terminate the string at the first space
+			char *p = strchr(ip_str, ' ');
+			if (p)
+				*p = 0;
+			oled_clear(OLED_A);
+			oled_write(OLED_A, 0,0, "Hi, zBitx is up on");
+			oled_write(OLED_A, 0,1, ip_str);
+			oled_write(OLED_A, 0, 2, "Press Func to start");
+			oled_refresh(OLED_A);
+		}
+		delay(100);
+	}
+	
+	oled_clear(OLED_A);
+	oled_write(OLED_A, 0, 3, "Starting...");
+	oled_refresh(OLED_A);
+}
+
+
+char oled_screen_text[1000] = {0};
+void oled_update(){
+	char buff[1000];
+	char const *mode;
+	char const *p;
+
+	//draw out the radio display 
+	if (in_tx)
+		strcpy(buff, "T");
+	else if (!strcmp(field_str("SPLIT"), "ON"))
+		strcpy(buff, "S");
+	else if (!strcmp(field_str("VFO"), "A"))
+		strcpy(buff, "A");
+	else	
+		strcpy(buff, "B");
+	strcat(buff, ":");
+	strcat(buff, freq_with_separators(field_str("FREQ")));
+	
+	mode = field_str("MODE");
+	char *q = buff + strlen(buff);
+	strncpy(q, p, 5);
+	*(q + 5) = 0; 
+	strcat(buff, "\n>Audio:");
+	p = field_str("AUDIO");
+	strcat(buff, p);
+	strcat(buff, "\n Drive:");
+	strcat(buff, field_str("DRIVE"));
+	strcat(buff, "\n BW   :");
+	strcat(buff, field_str("BW"));
+	if (!strcmp(mode, "FT8")){
+		strcat(buff, "\n Pitch:");
+		strcat(buff, field_str("TX_PITCH"));
+	}
+	else if (!strcmp(mode, "LSB") || !strcmp(mode, "USB")){
+		strcat(buff, "\n Mic  :");
+		strcat(buff, field_str("MIC"));
+	}
+	else {
+		strcat(buff, "\n Pitch:");
+		strcat(buff, field_str("PITCH"));
+	}	
+
+	if (!strncmp(buff, oled_screen_text, sizeof(oled_screen_text)))
+		return;
+	strcpy(oled_screen_text, buff);
+	oled_clear(OLED_A);
+	
+	p = buff;
+	for (int i = 0; i < 8; i++){
+		p = oled_write(OLED_A, 0, i, p);
+		if(*p == '\n')
+			p++;
+		else
+			break;
+	}
+	
+	oled_refresh(OLED_A);		
+}
+
+void oled_toggle_band(){
+	unsigned int freq_now = field_int("FREQ");
+	//choose the next band 
+	int  band_now = 1;
+	for (int i = 0; i < sizeof(band_stack)/sizeof(struct band); i++){
+		if (band_stack[i].start <= freq_now && freq_now <= band_stack[i].stop)
+			band_now = i;	
+	}
+	if (band_now == (sizeof(band_stack)/sizeof(struct band)) -1)
+		change_band("80M");
+	else
+		change_band(band_stack[band_now+1].name); 
+}
+
 void hw_init(){
 	wiringPiSetup();
 	init_gpio_pins();
@@ -3544,6 +3647,10 @@ void hw_init(){
 
 	wiringPiISR(ENC2_A, INT_EDGE_BOTH, tuning_isr);
 	wiringPiISR(ENC2_B, INT_EDGE_BOTH, tuning_isr);
+	if (!oled_init()){
+		oled_available = 1;
+		oled_setup();
+	}
 }
 
 void hamlib_tx(int tx_input){
@@ -3795,11 +3902,7 @@ gboolean ui_tick(gpointer gook){
 		update_field(f);	//move this each time the spectrum watefall index is moved
 		f = get_field("waterfall");
 		update_field(f);
-
 		update_titlebar();
-/*		f = get_field("#status");
-		update_field(f);
-*/
 
 		if (digitalRead(ENC1_SW) == 0){
 			//flip between mode and volume
@@ -3809,8 +3912,9 @@ gboolean ui_tick(gpointer gook){
 				focus_field(get_field("r1:volume"));
 			printf("Focus is on %s\n", f_focus->label);
 		}
+		
 		if (digitalRead(ENC2_SW) == 0)
-		oled_toggle_band();
+			oled_toggle_band();
 
 		if (record_start)
 			update_field(get_field("#record"));
@@ -3854,6 +3958,8 @@ gboolean ui_tick(gpointer gook){
       gdk_window_set_cursor(gdk_get_default_root_window(), new_cursor);
     }
 
+		if (oled_available)
+			oled_update();
 		ticks = 0;
   }
 	//update_field(get_field("#text_in")); //modem might have extracted some text
@@ -4536,6 +4642,7 @@ int main( int argc, char* argv[] ) {
 
 	rtc_sync();
 
+
 	struct field *f;
 	f = active_layout;
 
@@ -4598,12 +4705,12 @@ int main( int argc, char* argv[] ) {
   write_console(FONT_LOG, "\r\nEnter \\help for help\r\n");
 
 	if (strcmp(get_field("#mycallsign")->value, "NOBODY")){
-		sprintf(buff, "\nWelcome %s your grid is %s\n", 
+		sprintf(buff, "\nWelcome %s\nYour grid is %s\n", 
 		get_field("#mycallsign")->value, get_field("#mygrid")->value);
 		write_console(FONT_LOG, buff);
 	}
 	else 
-		write_console(FONT_LOG, "Set your with '\\callsign [yourcallsign]'\n"
+		write_console(FONT_LOG, "Set your callsign with '\\callsign [yourcallsign]'\n"
 		"Set your 6 letter grid with '\\grid [yourgrid]\n");
 
 	set_field("#text_in", "");
