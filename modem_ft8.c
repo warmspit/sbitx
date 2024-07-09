@@ -739,7 +739,7 @@ int ft8_message_tokenize(char *message){
 			m4[0] = 0;
 	}
 	else
-		m3[0];
+		m3[0] = 0;
 
 	return 0;
 }
