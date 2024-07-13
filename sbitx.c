@@ -97,6 +97,8 @@ static int rx_pitch = 700; //used only to offset the lo for CW,CWR
 static int bridge_compensation = 100;
 static double voice_clip_level = 0.04;
 static int in_calibration = 1; // this turns off alc, clipping et al
+static int mode_in_tune = MODE_USB;
+static int in_tune_tx = 0;
 
 #define MUTE_MAX 6 
 static int mute_count = 50;
@@ -824,6 +826,8 @@ void tx_process(
 		if (r->mode == MODE_2TONE)
 			i_sample = (1.0 * (vfo_read(&tone_a) 
 										+ vfo_read(&tone_b) )) / 50000000000.0;
+		else if (r->mode == MODE_TUNE)
+			i_sample = (1.0 * vfo_read(&tone_a)) / 50000000000.0;
 		else if (r->mode == MODE_CALIBRATE)
 			i_sample = (1.0 * (vfo_read(&tone_a))) / 30000000000.0;
 		else if (r->mode == MODE_CW || r->mode == MODE_CWR || r->mode == MODE_FT8)
@@ -1376,6 +1380,8 @@ void sdr_request(char *request, char *response){
 			rx_list->mode = MODE_CWR;
 		else if (!strcmp(value, "2TONE"))
 			rx_list->mode = MODE_2TONE;
+		else if (!strcmp(value, "TUNE"))
+			rx_list->mode = MODE_TUNE;
 		else if (!strcmp(value, "FT8"))
 			rx_list->mode = MODE_FT8;
 		else if (!strcmp(value, "AM"))
@@ -1383,8 +1389,8 @@ void sdr_request(char *request, char *response){
 		else
 			rx_list->mode = MODE_USB;
 		
-    		//set the tx mode to that of the rx1
-    		tx_list->mode = rx_list->mode;
+ 		//set the tx mode to that of the rx1
+ 		tx_list->mode = rx_list->mode;
 
 		// An interesting but non-essential note:
 		// the sidebands inverted twice, to come out correctly after all

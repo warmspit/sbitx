@@ -895,7 +895,6 @@ int sound_loop(){
 		ii += 2;	// Skip a pair of samples to account for the 96K sample to 48K sample rate change.
 	}
 
-
 	// This is the new pcm loopback write routine
 	framesize = (ret_card + 1) /2;		// only writing half the number of samples because of the slower channel rate
 	offset = 0;
