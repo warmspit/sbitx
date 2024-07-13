@@ -26,4 +26,4 @@ void	sound_thread_stop();
 void sound_volume(char *card_name, char *element, int volume);
 void sound_mixer(char *card_name, char *element, int make_on);
 void sound_input(int loop);
-unsigned long sbitx_millis();
+unsigned long sbitx_millis(); //polled at every sound_process block

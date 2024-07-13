@@ -36,6 +36,11 @@ extern int display_freq;
 #define FONT_FT8_QUEUED 14
 #define FONT_FT8_REPLY 15
 
+#define FF_MYCALL 16
+#define FF_CALLER 17
+#define FF_GRID 18
+
+
 void enter_qso();
 void call_wipe();
 void write_console(int style, char *text);
@@ -48,4 +53,18 @@ void update_log_ed();
 void write_call_log();
 time_t time_sbitx();
 
+void tlog(char * id, char * text, int p);
+//void tlogf(char * format, ...);
+
+// 006 : Click fix by Beckman
+// 007 : FT8 webui fix and coloring
+// 008 : Callsign lookup, and grid visited coloring
+// 009 : FT8 EXCH field safeguard
+// 010 : FT8 callsign and grid decoration
+// 011 : FT8 CQ click error fixed
+// 012 : FT8 click non CQ fixed
+// 013 : FT8 web_q overflow fixed
+// 014 : Web GridMap v1, and cur selected Band/Store shown
+// 015 : Web Robinson zoom GridMap, mouseover grid info, Logged Seen btn
+// 016 : Cleanout and prepare for github sbitx-oz7bx v3.02.0016
 #define VER_STR "sbitx v3.021"
