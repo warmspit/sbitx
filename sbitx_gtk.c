@@ -541,7 +541,7 @@ struct field main_controls[] = {
 		"", 50, 5000, 50,COMMON_CONTROL},
 
 	{ "r1:mode", NULL, 5, 5, 40, 40, "MODE", 40, "USB", FIELD_SELECTION, FONT_FIELD_VALUE, 
-		"USB/LSB/CW/CWR/FT8/AM/DIGITAL/TUNE//2TONE", 0,0,0, COMMON_CONTROL},
+		"USB/LSB/CW/CWR/FT8/AM/DIGITAL/2TONE", 0,0,0, COMMON_CONTROL},
 
 	/* logger controls */
 
@@ -560,7 +560,7 @@ struct field main_controls[] = {
 	{"#wipe", NULL, 330, 50, 40, 40, "WIPE", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE,"", 0,0,0,COMMON_CONTROL}, 
 	{"#mfqrz", NULL, 370, 50, 40, 40, "QRZ", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE,"", 0,0,0,COMMON_CONTROL}, 
 	{"#logbook", NULL, 410, 50, 40, 40, "LOG", 1, "", FIELD_BUTTON, FONT_FIELD_VALUE,"", 0,0,0,COMMON_CONTROL}, 
-	{"#tune", do_tune_tx, 450, 50, 40, 40, "TUNE", 1, "OFF", FIELD_TOGGLE, FONT_FIELD_VALUE,"ON/OFF", 0,0,0,COMMON_CONTROL}, 
+	{"#tune", NULL, 450, 50, 40, 40, "TUNE", 1, "OFF", FIELD_TOGGLE, FONT_FIELD_VALUE,"ON/OFF", 0,0,0,COMMON_CONTROL}, 
 	{"#text_in", do_text, 5, 70, 285, 20, "TEXT", 70, "text box", FIELD_TEXT, FONT_LOG, 
 		"nothing valuable", 0,128,0,COMMON_CONTROL},
 
@@ -2765,15 +2765,17 @@ int do_bandwidth(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
 
 static char tune_tx_saved_mode[100];
 int do_tune_tx(struct field *f, cairo_t *gfx, int event, int a, int b, int c){
-	if(event == GDK_BUTTON_PRESS){
+	if(event == FIELD_EDIT){
 		printf("tune_tx : %s\n", f->value);
 		if (!strcmp(f->value, "ON")){
+			puts("Turning on TUNE");	
 			strcpy(tune_tx_saved_mode, get_field("r1:mode")->value);
 			field_set("MODE", "TUNE");	
 			update_field(get_field("r1:mode"));
 			tx_on(TX_SOFT);
 		}
 		else{
+			puts("Turning off TUNE");
 			tx_off();
 			field_set("MODE", tune_tx_saved_mode);	
 			update_field(get_field("r1:mode"));
@@ -4446,6 +4448,23 @@ void do_control_action(char *cmd){
 		!strcmp(request, "10M")){
 		change_band(request); 		
 	}
+	else if(!strcmp(request, "TUNE ON")){
+		puts("Turning on TUNE");	
+		strcpy(tune_tx_saved_mode, get_field("r1:mode")->value);
+		//field_set("MODE", "TUNE");	
+		//update_field(get_field("r1:mode"));
+		//this is not correct, but ...
+		char response[200];
+		sdr_request("r1:mode=TUNE", response);
+		delay(100);
+		tx_on(TX_SOFT);
+	}
+	else if(!strcmp(request, "TUNE OFF")){
+		puts("Turning off TUNE");
+		tx_off();
+		field_set("MODE", tune_tx_saved_mode);	
+		update_field(get_field("r1:mode"));
+	}
 	else if (!strcmp(request, "REC ON")){
 		char fullpath[200];	//dangerous, find the MAX_PATH and replace 200 with it
 
@@ -4924,6 +4943,7 @@ int main( int argc, char* argv[] ) {
 	set_field("#text_in", "");
 	field_set("REC", "OFF");
 	field_set("KBD", "OFF");
+	field_set("TUNE", "OFF");
 
 	// you don't want to save the recently loaded settings
 	settings_updated = 0;

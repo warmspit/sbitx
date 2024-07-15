@@ -434,6 +434,7 @@ void modem_poll(int mode){
 
 	if (current_mode != mode){
 		//flush out the past decodes
+		printf("modem_poll set to %d\n", mode);
 		current_mode = mode;
 		int l;
 		do{
@@ -446,7 +447,7 @@ void modem_poll(int mode){
 
 		if (current_mode == MODE_FT8)
 			macro_load("FT8", NULL);
-		else if (MODE_CWR || MODE_CW){
+		else if (current_mode == MODE_CWR || current_mode == MODE_CW){
 			macro_load("CW1", NULL);	
 			modem_set_pitch(get_pitch());
 		}

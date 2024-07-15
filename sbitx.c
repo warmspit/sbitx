@@ -53,10 +53,6 @@ fftw_plan plan_spectrum;
 float spectrum_window[MAX_BINS];
 void set_rx1(int frequency);
 void tr_switch(int tx_on);
-float min_fft_level;
-int rx_gain_slow_count = 0;
-int rx_gain_fast_attack = 0;	// Flag to enable Fast IF Gain Changes
-int rx_gain_changed = 0;	// Flag to indicate a change in rx_gain has been called for
 
 // Wisdom Defines for the FFTW and FFTWF libraries
 // Options for WISDOM_MODE from least to most rigorous are FFTW_ESTIMATE, FFTW_MEASURE, FFTW_PATIENT, and FFTW_EXHAUSTIVE
@@ -293,10 +289,7 @@ void set_lpf_40mhz(int frequency){
 
 void set_rx1(int frequency){
 	static int last_frequency;		// Holds the last frequency set - used by the Auto IF Gain algorithm
-	if ((abs(frequency - last_frequency) > 1000000) && in_tx == 0)
-	{
-		rx_gain_fast_attack = 1;	// Kick the Auto IF Gain algorithm into fast attack mode if the frequency change is > 1 MHz
-	}
+
 	last_frequency = frequency;
 	if (frequency == freq_hdr)
 		return;
@@ -552,11 +545,6 @@ void my_fftw_execute(fftw_plan f){
 
 static int32_t rx_am_avg = 0;
 
-void auto_if_gain_clear() {
-	rx_gain_slow_count = 0;
-	rx_gain_fast_attack = 0;	// Flag to enable Fast IF Gain Changes
-	rx_gain_changed = 0;
-}
 static int rx_tick = 0;
 static char bufDebugTick[200];
 
@@ -609,66 +597,6 @@ void rx_linear(int32_t *input_rx,  int32_t *input_mic,
 
 	// the spectrum display is updated
 	spectrum_update();
-	
-	// Make adjustments to IF Gain
-	min_fft_level = 10000;				// Set high before starting to find the lowest level in the fft_bins array
-		
-	for(i=1269; i<1800; i++)
-	{
-		if (fft_bins[i] < min_fft_level)
-		{
-			min_fft_level = fft_bins[i];	// new lowest level
-		}
-	}
-
-#define TARGET_FFT_LEVEL 0.015	
-#define FAST_MIN_FFT_LEVEL 0.008
-#define FAST_MAX_FFT_LEVEL 0.025
-    //if (rx_tick % 100 == 0) { sprintf(bufDebugTick,"%9.2f ",min_fft_level); tlog("rx_tick", bufDebugTick, rx_gain);}
-	// Allow for fast IF Gain changes if the rx_gain_fast_attack flag is set (see set_rx1 function in this file)
-	
-	if (((min_fft_level < FAST_MIN_FFT_LEVEL) || (min_fft_level > FAST_MAX_FFT_LEVEL)) && (rx_gain_fast_attack == 1))
-	{
-		rx_gain_slow_count = 0;			// Reset slow IF Gain Loop counter
-		if (min_fft_level < FAST_MIN_FFT_LEVEL)
-		{
-			rx_gain += 5;		// Plan to increase up RX Gain 
-			rx_gain_changed = 1;	// Flag to request a big RX Gain change
-		}
-		else if (min_fft_level > FAST_MAX_FFT_LEVEL)
-		{
-			rx_gain -= 5;		// Plan to decrease RX Gain
-			rx_gain_changed = 1;	// Flag to request a big RX Gain change			
-		}
-	}
-	else
-	{
-		rx_gain_slow_count++;				// Only make fine adjustments to rx_gain every second.
-		if (rx_gain_slow_count > 106)		// Approx 106 blocks of samples per second
-		{
-			rx_gain_fast_attack = 0;		// If the IF gain is close to correct for a second, stop fast IF Gain changes.			
-			rx_gain_slow_count = 0;			
-			if (min_fft_level < TARGET_FFT_LEVEL)
-			{
-					rx_gain += 1;
-					rx_gain_changed = 1;	// Flag to request a small RX Gain change
-			}
-			else
-			{
-					rx_gain -= 1;
-					rx_gain_changed = 1;	// Flag to request a small RX Gain change
-			}
-		}
-	}
-	
-	if((!in_tx) && rx_gain_changed == 1)
-	{
-			// sound_mixer(audio_card, "Capture", rx_gain);		// This function call is not needed
-			char rx_gain_buff[8];
-			(void) sprintf(rx_gain_buff, "%d", rx_gain);
-			set_field("r1:gain", rx_gain_buff);
-			rx_gain_changed = 0;
-	}	
 
 	// ... back to the actual processing, after spectrum update  
 
@@ -1229,60 +1157,60 @@ void tr_switch_de(int tx_on){
 
 //v2 t/r switch uses the lpfs to cut the feedback during t/r transitions
 void tr_switch_v2(int tx_on){
-		if (tx_on){
+	if (tx_on){
 
-			//first turn off the LPFs, so PA doesnt connect 
-  		digitalWrite(LPF_A, LOW);
-  		digitalWrite(LPF_B, LOW);
+		//first turn off the LPFs, so PA doesnt connect 
+ 		digitalWrite(LPF_A, LOW);
+ 		digitalWrite(LPF_B, LOW);
+  	digitalWrite(LPF_C, LOW);
+ 		digitalWrite(LPF_D, LOW);
+
+		//mute it all and hang on for a millisecond
+		sound_mixer(audio_card, "Master", 0);	
+		sound_mixer(audio_card, "Capture", 0);
+		delay(1);
+
+		//now switch of the signal back
+		//now ramp up after 5 msecs
+		delay(2);
+		mute_count = 20;
+		tx_process_restart = 1;
+		digitalWrite(TX_LINE, HIGH);
+     delay(20);
+		set_tx_power_levels();
+		in_tx = 1;
+		prev_lpf = -1; //force this
+		set_lpf_40mhz(freq_hdr);
+		delay(10);
+		spectrum_reset();
+	}
+	else {
+		in_tx = 0;
+		//mute it all and hang on
+		sound_mixer(audio_card, "Master", 0);
+		sound_mixer(audio_card, "Capture", 0);
+		delay(1);
+    fft_reset_m_bins();
+		mute_count = MUTE_MAX;
+
+  	digitalWrite(LPF_A, LOW);
+  	digitalWrite(LPF_B, LOW);
  	 	digitalWrite(LPF_C, LOW);
-  		digitalWrite(LPF_D, LOW);
-
-			//mute it all and hang on for a millisecond
-			sound_mixer(audio_card, "Master", 0);	
-			sound_mixer(audio_card, "Capture", 0);
-			delay(1);
-
-			//now switch of the signal back
-			//now ramp up after 5 msecs
-			delay(2);
-			mute_count = 20;
-			tx_process_restart = 1;
-			digitalWrite(TX_LINE, HIGH);
-      delay(20);
-			set_tx_power_levels();
-			in_tx = 1;
-			prev_lpf = -1; //force this
-			set_lpf_40mhz(freq_hdr);
-			delay(10);
-			spectrum_reset();
-		}
-		else {
-			in_tx = 0;
-			//mute it all and hang on
-			sound_mixer(audio_card, "Master", 0);
-			sound_mixer(audio_card, "Capture", 0);
-			delay(1);
-      fft_reset_m_bins();
-			mute_count = MUTE_MAX;
-
-  		digitalWrite(LPF_A, LOW);
-  		digitalWrite(LPF_B, LOW);
- 	 		digitalWrite(LPF_C, LOW);
-  		digitalWrite(LPF_D, LOW);
-			prev_lpf = -1; //force the lpf to be re-energized
-			delay(10);
-			//power down the PA chain to null any gain
-			digitalWrite(TX_LINE, LOW);
-			delay(5); 
-			//audio codec is back on
-			// Set a level for receiver volume - left channel
-			sound_mixer(audio_card, "Master",  rx_vol);			// Need to change - N3SB
-			sound_mixer(audio_card, "Capture", rx_gain);
-			spectrum_reset();
-			prev_lpf = -1;
-			set_lpf_40mhz(freq_hdr);
-			//rx_tx_ramp = 10;
-		}
+  	digitalWrite(LPF_D, LOW);
+		prev_lpf = -1; //force the lpf to be re-energized
+		delay(10);
+		//power down the PA chain to null any gain
+		digitalWrite(TX_LINE, LOW);
+		delay(5); 
+		//audio codec is back on
+		// Set a level for receiver volume - left channel
+		sound_mixer(audio_card, "Master",  rx_vol);			// Need to change - N3SB
+		sound_mixer(audio_card, "Capture", rx_gain);
+		spectrum_reset();
+		prev_lpf = -1;
+		set_lpf_40mhz(freq_hdr);
+		//rx_tx_ramp = 10;
+	}
 }
 
 void tr_switch(int tx_on){
@@ -1481,16 +1409,10 @@ void sdr_request(char *request, char *response){
 	else if (!strcmp(cmd, "bridge")){
     bridge_compensation = atoi(value);
 	}
-	    
-    // Capture controls IF Gain
-    // Master controls Volume
-   
 	else if(!strcmp(cmd, "r1:gain")){
 		rx_gain = atoi(value);
-		if(!in_tx) {
-			auto_if_gain_clear();  // by oz7bx
+		if(!in_tx) 
 			sound_mixer(audio_card, "Capture", rx_gain);
-		}
 	}
 	else if (!strcmp(cmd, "r1:volume")){
 		rx_vol = atoi(value);
