@@ -1697,10 +1697,15 @@ void draw_waterfall(struct field *f, cairo_t *gfx){
 	cairo_fill(gfx);
 }
 
+void draw_s_meter(struct field *spectrum, cairo_t *gfx){
+	rect(gfx, spectrum->x+1, spectrum->y+2, 200 , 10, SELECTED_LINE, 2);
+}
+
 void draw_spectrum_grid(struct field *f_spectrum, cairo_t *gfx){
 	int sub_division, grid_height;
 	struct field *f = f_spectrum;
 
+	draw_s_meter(f, gfx);
 	sub_division = f->width / 10;
 	grid_height = f->height - (font_table[FONT_SMALL].height * 4 / 3); 
 

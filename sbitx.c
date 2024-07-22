@@ -985,13 +985,12 @@ static void read_hw_ini(){
  	here we adjust the drive levels to keep it up, almost level
 */
 void set_tx_power_levels(){
- // printf("Setting tx_power to %d, gain to %d\n", tx_power_watts, tx_gain);
 	//int tx_power_gain = 0;
 
 	//search for power in the approved bands
 	for (int i = 0; i < sizeof(band_power)/sizeof(struct power_settings); i++){
 		if (band_power[i].f_start <= freq_hdr && freq_hdr <= band_power[i].f_stop){
-		
+	
 			//next we do a decimal coversion of the power reduction needed
 			tx_amp = (1.0 * tx_drive * band_power[i].scale);  
 		}	
@@ -1403,6 +1402,7 @@ void sdr_request(char *request, char *response){
 	}
 	else if (!strcmp(cmd, "tx_power")){
     tx_drive = atoi(value);
+		printf("tx_drive set to %d\n", tx_drive);
 		if(in_tx)
 			set_tx_power_levels();	
 	}
