@@ -1402,7 +1402,6 @@ void sdr_request(char *request, char *response){
 	}
 	else if (!strcmp(cmd, "tx_power")){
     tx_drive = atoi(value);
-		printf("tx_drive set to %d\n", tx_drive);
 		if(in_tx)
 			set_tx_power_levels();	
 	}
