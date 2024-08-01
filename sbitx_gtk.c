@@ -30,7 +30,7 @@ The initial sync between the gui values, the core radio values, settings, et al 
 #include <errno.h>
 #include <sys/file.h>
 #include <errno.h>
-#include <wiringPi.h>
+#include <// wiringPi.h>
 #include <wiringSerial.h>
 #include "sdr.h"
 #include "sound.h"

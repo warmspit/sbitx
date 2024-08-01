@@ -6,7 +6,7 @@
 #include <complex.h>
 #include <fftw3.h>
 #include <unistd.h>
-#include <wiringPi.h>
+#include <// wiringPi.h>
 #include <wiringSerial.h>
 #include "sdr.h"
 #include "sdr_ui.h"

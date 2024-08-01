@@ -7,7 +7,7 @@
 
 #include "i2cBitBangingBus.h"
 
-#include <wiringPi.h>
+#include <// wiringPi.h>
 
 #include <iostream>
 #include <memory>

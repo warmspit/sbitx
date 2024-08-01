@@ -26,7 +26,7 @@ At first it wrote it in python as I had not specified C, then I asked:
 #include <complex.h>
 #include <fftw3.h>
 #include <unistd.h>
-#include <wiringPi.h>
+#include <// wiringPi.h>
 #include <wiringSerial.h>
 #include <linux/types.h>
 #include <stdint.h>

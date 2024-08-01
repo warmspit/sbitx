@@ -2,7 +2,7 @@
 #include <linux/types.h>
 #include <stdint.h>
 #include <string.h>
-#include <wiringPi.h>
+#include <// wiringPi.h>
 #include "i2cbb.h"
 #include "oled.h"
 
